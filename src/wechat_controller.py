@@ -6,9 +6,7 @@
 """
 
 import asyncio
-import io
 import logging
-import sys
 import time
 from typing import Any, Dict, Optional
 
@@ -27,8 +25,6 @@ class WeChatController:
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
-
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = 0.3
@@ -145,6 +141,18 @@ class WeChatController:
                 pass  # 可能会因为 Windows 限制而失败
 
             # 3. 检查是否已经置顶
+            if win32gui.GetForegroundWindow() == hwnd:
+                return True
+
+            # Foreground lock: a synthetic Alt press makes this process the last input source
+            try:
+                win32api.keybd_event(win32con.VK_MENU, 0, 0, 0)
+                try:
+                    win32gui.SetForegroundWindow(hwnd)
+                finally:
+                    win32api.keybd_event(win32con.VK_MENU, 0, win32con.KEYEVENTF_KEYUP, 0)
+            except Exception as e:
+                self.logger.error(f"Alt-key foreground attempt failed: {e}")
             if win32gui.GetForegroundWindow() == hwnd:
                 return True
 
