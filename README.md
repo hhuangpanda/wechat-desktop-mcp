@@ -2,12 +2,11 @@
 
 <div align="center">
 
-![GitHub stars](https://img.shields.io/github/stars/1052666/WeChat-MCP-Server?style=social)
-![GitHub forks](https://img.shields.io/github/forks/1052666/WeChat-MCP-Server?style=social)
-![GitHub license](https://img.shields.io/github/license/1052666/WeChat-MCP-Server)
 ![Python version](https://img.shields.io/badge/python-3.8%2B-blue)
 
 **一个符合 Model Context Protocol (MCP) 标准的微信消息发送服务器，专为AI助手设计**
+
+**简体中文** | [English](README.en.md)
 
 [快速开始](#-安装和配置) • [功能特点](#-功能特点) • [使用方法](#-使用方法) • [API文档](#️-可用工具) • [贡献指南](#-贡献)
 
@@ -29,11 +28,9 @@
 - [注意事项](#️-注意事项)
 - [故障排除](#-故障排除)
 - [开发和扩展](#-开发和扩展)
-- [支持我们](#-支持我们)
 - [免责声明](#️-重要免责声明)
 - [许可证](#-许可证)
 - [贡献](#-贡献)
-- [项目统计](#-项目统计)
 
 ---
 
@@ -74,13 +71,12 @@ WeChat-MCP-Server/
 │   └── 📄 mcp_client_example.py  # 客户端使用示例
 ├── 📂 docs/
 │   └── 📄 QUICK_START.md         # 快速开始指南
-├── 📂 支持我们/
-│   ├── 🖼️ 1.jpg                  # 支付宝收款码
-│   └── 🖼️ 2.jpg                  # 微信赞赏码
 ├── 📄 mcp_config.json           # MCP配置文件
 ├── 📄 requirements.txt          # 依赖包列表
 ├── 📄 LICENSE                   # 许可证文件
-└── 📄 README.md                # 项目说明文档
+├── 📄 AGENTS.md                 # AI助手工作指引
+├── 📄 README.md                 # 项目说明文档（中文）
+└── 📄 README.en.md              # 项目说明文档（英文）
 ```
 
 ## 🚀 安装和配置
@@ -89,7 +85,7 @@ WeChat-MCP-Server/
 
 ```bash
 # 克隆项目
-git clone https://github.com/1052666/WeChat-MCP-Server.git
+git clone https://github.com/hhuangpanda/WeChat-MCP-Server.git
 cd WeChat-MCP-Server
 
 # 安装依赖
@@ -414,34 +410,6 @@ python mcp_client_example.py
 - [ ] 增加更多微信操作功能（如发送图片、文件等）
 
 
-## 💖 支持我们
-
-如果您觉得这个项目对您有帮助，请考虑：
-
-- ⭐ 给项目点个Star
-- 🔄 分享给您的朋友
-- 💰 考虑捐赠以支持项目维护和发展
-
-### 💳 捐赠方式
-
-如果您愿意支持项目的持续发展，可以通过以下方式进行捐赠：
-
-<div align="center">
-
-**支付宝收款码**
-
-<img src="支持我们/1.jpg" alt="支付宝收款码" width="200"/>
-
-**微信赞赏码**
-
-<img src="支持我们/2.jpg" alt="微信赞赏码" width="200"/>
-
-</div>
-
-您的每一份支持都是我们持续改进和维护项目的动力！❤️
-
----
-
 ## ⚠️ 重要免责声明
 
 > **🚨 严重警告**
@@ -555,20 +523,11 @@ MIT许可证允许：
 我们欢迎所有形式的贡献！
 
 ### 🐛 报告问题
-- 使用 [Issues](https://github.com/1052666/WeChat-MCP-Server/issues) 报告bug
+- 使用 [Issues](https://github.com/hhuangpanda/WeChat-MCP-Server/issues) 报告bug
 - 提供详细的错误信息和复现步骤
 
-## 📞 联系我们
-
-如果您有任何问题、建议或合作意向，欢迎通过以下方式联系我们：
-
-- **微信号**: 13115979196
-- **GitHub**: [提交Issue](https://github.com/1052666/WeChat-MCP-Server/issues)
-
-我们会尽快回复您的咨询！
-
 ### 💡 功能建议
-- 在 [Issues](https://github.com/1052666/WeChat-MCP-Server/issues) 中提出新功能建议
+- 在 [Issues](https://github.com/hhuangpanda/WeChat-MCP-Server/issues) 中提出新功能建议
 - 详细描述功能需求和使用场景
 
 ### 🔧 代码贡献
@@ -577,36 +536,6 @@ MIT许可证允许：
 3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 创建 Pull Request
-
----
-
-## 📈 项目统计
-
-### ⭐ Star 增长趋势
-
-<div align="center">
-
-[![Star History Chart](https://api.star-history.com/svg?repos=1052666/WeChat-MCP-Server&type=Date)](https://star-history.com/#1052666/WeChat-MCP-Server&Date)
-
-</div>
-
-### 📊 项目数据
-
-<div align="center">
-
-![GitHub stars](https://img.shields.io/github/stars/1052666/WeChat-MCP-Server?style=social)
-![GitHub forks](https://img.shields.io/github/forks/1052666/WeChat-MCP-Server?style=social)
-![GitHub watchers](https://img.shields.io/github/watchers/1052666/WeChat-MCP-Server?style=social)
-
-![GitHub issues](https://img.shields.io/github/issues/1052666/WeChat-MCP-Server)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/1052666/WeChat-MCP-Server)
-![GitHub last commit](https://img.shields.io/github/last-commit/1052666/WeChat-MCP-Server)
-
-![GitHub repo size](https://img.shields.io/github/repo-size/1052666/WeChat-MCP-Server)
-![GitHub code size](https://img.shields.io/github/languages/code-size/1052666/WeChat-MCP-Server)
-![GitHub top language](https://img.shields.io/github/languages/top/1052666/WeChat-MCP-Server)
-
-</div>
 
 ---
 
