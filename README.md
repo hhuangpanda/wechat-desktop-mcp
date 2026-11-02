@@ -114,6 +114,33 @@ pip install -r requirements.txt
 }
 ```
 
+### show_scheduled_wechat_messages
+
+显示待发送的定时消息（`pending`）和最近 20 条已触发消息的发送结果（`recent`）。无参数。`result` 与 `send_wechat_message` 的返回文本相同。
+
+列表保存在内存中，仅包含本服务器进程安排的消息，进程退出后清空。
+
+```json
+{
+  "pending": [
+    {
+      "contact_name": "文件传输助手",
+      "message": "This is a scheduled message!",
+      "scheduled_for": "2026-11-01T15:00:00-05:00",
+      "seconds_remaining": 30
+    }
+  ],
+  "recent": [
+    {
+      "contact_name": "文件传输助手",
+      "message": "Earlier message",
+      "scheduled_for": "2026-11-01T14:30:00-05:00",
+      "result": "Message sent successfully"
+    }
+  ]
+}
+```
+
 ## 使用方法
 
 配置完成后，可以直接在AI助手中使用自然语言请求：

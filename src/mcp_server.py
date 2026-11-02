@@ -7,6 +7,7 @@
 import asyncio
 import json
 import sys
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 import logging
 import io
@@ -104,6 +105,14 @@ class MCPServer:
                     },
                     "required": ["contact_name", "message", "delay_seconds"]
                 }
+            },
+            {
+                "name": "show_scheduled_wechat_messages",
+                "description": "显示待发送的定时微信消息和最近 20 条已触发消息的发送结果。仅包含本服务器进程安排的消息，进程退出后清空，因此空列表不代表其他进程没有定时消息",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {}
+                }
             }
         ]
     
@@ -181,6 +190,8 @@ class MCPServer:
             return await self._execute_send_message(arguments, request_id)
         elif tool_name == "schedule_wechat_message":
             return await self._execute_schedule_message(arguments, request_id)
+        elif tool_name == "show_scheduled_wechat_messages":
+            return await self._execute_show_scheduled(request_id)
         else:
             error = {
                 "code": -32601,
@@ -188,6 +199,20 @@ class MCPServer:
             }
             return JSONRPCResponse(error=error, id=request_id).to_dict()
     
+    @staticmethod
+    def _format_send_result(send_result: Union[bool, Dict[str, Any]]) -> str:
+        """将发送结果转换为工具返回的文本。"""
+        success = send_result if isinstance(send_result, bool) else bool(send_result.get("ok"))
+        if success:
+            return "Message sent successfully"
+        if isinstance(send_result, dict):
+            stage = send_result.get("stage")
+            reason = send_result.get("reason")
+            version = send_result.get("wechat_version")
+            is_nt = send_result.get("is_nt_framework")
+            return f"Failed to send message (stage={stage}, reason={reason}, wechat_version={version}, nt={is_nt})"
+        return "Failed to send message"
+
     async def _execute_send_message(self, arguments: Dict[str, Any], request_id: Optional[Union[str, int]]) -> Dict[str, Any]:
         """执行 send_wechat_message 工具。"""
         try:
@@ -207,37 +232,17 @@ class MCPServer:
             controller = WeChatController()
             send_result = await controller.send_text_message(contact_name, message)
 
-            success = send_result if isinstance(send_result, bool) else bool(send_result.get("ok"))
+            result = {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": self._format_send_result(send_result)
+                    }
+                ]
+            }
 
-            if success:
-                result = {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message sent successfully"
-                        }
-                    ]
-                }
-            else:
-                if isinstance(send_result, dict):
-                    stage = send_result.get("stage")
-                    reason = send_result.get("reason")
-                    version = send_result.get("wechat_version")
-                    is_nt = send_result.get("is_nt_framework")
-                    extra = f" (stage={stage}, reason={reason}, wechat_version={version}, nt={is_nt})"
-                else:
-                    extra = ""
-                result = {
-                    "content": [
-                        {
-                            "type": "text", 
-                            "text": f"Failed to send message{extra}"
-                        }
-                    ]
-                }
-            
             return JSONRPCResponse(result=result, id=request_id).to_dict()
-            
+
         except Exception as e:
             self.logger.error(f"Error executing send_message: {e}")
             error = {
@@ -289,6 +294,53 @@ class MCPServer:
             
         except Exception as e:
             self.logger.error(f"Error executing schedule_message: {e}")
+            error = {
+                "code": -32603,
+                "message": f"Tool execution error: {str(e)}"
+            }
+            return JSONRPCResponse(error=error, id=request_id).to_dict()
+
+    async def _execute_show_scheduled(self, request_id: Optional[Union[str, int]]) -> Dict[str, Any]:
+        """执行 show_scheduled_wechat_messages 工具。"""
+        try:
+            from wechat_controller import WeChatController
+
+            scheduled = WeChatController.list_scheduled()
+            now = datetime.now().astimezone()
+            payload = {
+                "pending": [
+                    {
+                        "contact_name": entry["contact_name"],
+                        "message": entry["message"],
+                        "scheduled_for": entry["scheduled_for"].isoformat(timespec="seconds"),
+                        "seconds_remaining": max(0, round((entry["scheduled_for"] - now).total_seconds()))
+                    }
+                    for entry in scheduled["pending"]
+                ],
+                "recent": [
+                    {
+                        "contact_name": entry["contact_name"],
+                        "message": entry["message"],
+                        "scheduled_for": entry["scheduled_for"].isoformat(timespec="seconds"),
+                        "result": self._format_send_result(entry["send_result"])
+                    }
+                    for entry in scheduled["recent"]
+                ]
+            }
+
+            result = {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(payload, ensure_ascii=False)
+                    }
+                ]
+            }
+
+            return JSONRPCResponse(result=result, id=request_id).to_dict()
+
+        except Exception as e:
+            self.logger.error(f"Error executing show_scheduled: {e}")
             error = {
                 "code": -32603,
                 "message": f"Tool execution error: {str(e)}"

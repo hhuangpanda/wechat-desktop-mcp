@@ -8,7 +8,10 @@
 import asyncio
 import logging
 import time
-from typing import Any, Dict, Optional
+import uuid
+from collections import deque
+from datetime import datetime, timedelta
+from typing import Any, Deque, Dict, List, Optional
 
 import psutil
 import pyautogui
@@ -19,7 +22,11 @@ import win32clipboard
 
 class WeChatController:
     """微信自动化操作控制器（仅 NT 版本）。"""
-    
+
+    # 类级别：每次工具调用都会新建控制器
+    _pending: Dict[str, Dict[str, Any]] = {}
+    _recent: Deque[Dict[str, Any]] = deque(maxlen=20)
+
     def __init__(self):
         # 设置日志级别为DEBUG
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -420,15 +427,26 @@ class WeChatController:
         """安排在延迟后发送消息。"""
         try:
             self.logger.info(f"Scheduling message to {contact_name} in {delay_seconds} seconds")
-            
+
+            entry_id = uuid.uuid4().hex
+            scheduled_for = datetime.now().astimezone() + timedelta(seconds=delay_seconds)
+            self._pending[entry_id] = {
+                "contact_name": contact_name,
+                "message": message,
+                "scheduled_for": scheduled_for,
+            }
+
             async def delayed_send():
                 await asyncio.sleep(delay_seconds)
+                entry = self._pending.pop(entry_id)
                 # 调用异步函数
                 try:
-                    await self.send_text_message(contact_name, message)
+                    send_result = await self.send_text_message(contact_name, message)
                 except Exception as e:
                     self.logger.error(f"Error in delayed send: {e}")
-            
+                    send_result = {"ok": False, "stage": "exception", "reason": str(e)}
+                self._recent.appendleft({**entry, "send_result": send_result})
+
             # 创建异步任务
             asyncio.create_task(delayed_send())
             
@@ -437,7 +455,15 @@ class WeChatController:
         except Exception as e:
             self.logger.error(f"Error scheduling message: {e}")
             return False
-    
+
+    @classmethod
+    def list_scheduled(cls) -> Dict[str, List[Dict[str, Any]]]:
+        """返回本进程中待发送的定时消息和最近已触发的消息。"""
+        return {
+            "pending": sorted(cls._pending.values(), key=lambda entry: entry["scheduled_for"]),
+            "recent": list(cls._recent),
+        }
+
     def default_test_contact(self) -> str:
         """按客户端语言（窗口标题）返回测试联系人：中文版 文件传输助手，英文版 File。"""
         hwnd = self._find_wechat_window()

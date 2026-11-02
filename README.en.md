@@ -114,6 +114,33 @@ Schedule a message to be sent after a specified delay.
 }
 ```
 
+### show_scheduled_wechat_messages
+
+Shows pending scheduled messages (`pending`) and the send results of the last 20 fired messages (`recent`). Takes no parameters. `result` is the same text `send_wechat_message` returns.
+
+The list is held in memory, covers only messages scheduled through this server process, and is cleared when the process exits.
+
+```json
+{
+  "pending": [
+    {
+      "contact_name": "文件传输助手",
+      "message": "This is a scheduled message!",
+      "scheduled_for": "2026-11-01T15:00:00-05:00",
+      "seconds_remaining": 30
+    }
+  ],
+  "recent": [
+    {
+      "contact_name": "文件传输助手",
+      "message": "Earlier message",
+      "scheduled_for": "2026-11-01T14:30:00-05:00",
+      "result": "Message sent successfully"
+    }
+  ]
+}
+```
+
 ## Usage
 
 Once configured, you can make requests to your AI assistant in natural language:
