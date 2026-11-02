@@ -32,24 +32,12 @@
 
 ```
 WeChat-MCP-Server/
-├── src/
-│   ├── __init__.py
-│   ├── mcp_server.py          # MCP服务器主要实现
-│   └── wechat_controller.py   # 微信自动化控制器
-├── tests/
-│   ├── test_server.py         # 服务器功能测试
-│   └── test_send_chinese.py   # 中文消息发送测试
-├── examples/
-│   └── mcp_client_example.py  # 客户端使用示例
-├── docs/
-│   ├── QUICK_START.md         # 快速开始指南（中文）
-│   └── QUICK_START.en.md      # 快速开始指南（英文）
-├── mcp_config.json            # MCP配置文件
-├── requirements.txt           # 依赖包列表
-├── LICENSE                    # 许可证文件
-├── AGENTS.md                  # AI助手工作指引
-├── README.md                  # 项目说明文档（中文）
-└── README.en.md               # 项目说明文档（英文）
+├── src/               # MCP服务器和微信控制器
+├── tests/             # 测试脚本
+├── examples/          # 客户端使用示例
+├── docs/              # 快速开始指南（中英文）
+├── mcp_config.json    # MCP配置文件
+└── requirements.txt   # 依赖包列表
 ```
 
 ## 安装和配置
