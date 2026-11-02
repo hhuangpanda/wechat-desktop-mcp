@@ -5,7 +5,7 @@ import sys
 import logging
 
 # 将 src 目录添加到 sys.path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from wechat_controller import WeChatController
 
@@ -24,7 +24,7 @@ async def main():
         return
 
     # 测试中文发送
-    contact = "10.14"
+    contact = "文件传输助手"
     message = "你好，这是一条中文测试消息"
     
     print(f"Sending message to {contact}: {message}")

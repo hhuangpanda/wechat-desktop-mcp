@@ -8,103 +8,65 @@
 
 [简体中文](README.md) | **English**
 
-[Quick Start](#-installation-and-setup) • [Features](#-features) • [Usage](#-usage) • [API Docs](#️-available-tools) • [Contributing](#-contributing)
-
 </div>
 
 ---
 
-## 📋 Table of Contents
+## What is MCP?
 
-- [What is MCP?](#-what-is-mcp)
-- [Features](#-features)
-- [Project Structure](#-project-structure)
-- [Installation and Setup](#-installation-and-setup)
-- [Available Tools](#️-available-tools)
-- [Usage](#-usage)
-- [Automated Tasks and Message Reporting](#-automated-tasks-and-message-reporting)
-- [MCP Protocol Implementation](#-mcp-protocol-implementation)
-- [Technical Architecture](#️-technical-architecture)
-- [Notes](#️-notes)
-- [Troubleshooting](#-troubleshooting)
-- [Development and Extension](#-development-and-extension)
-- [Disclaimer](#️-important-disclaimer)
-- [License](#-license)
-- [Contributing](#-contributing)
+**Model Context Protocol (MCP)** is an open standard protocol for connecting AI assistants to various data sources and tools. It is like the USB-C port for AI applications, providing a standardized way to connect AI models to external systems.
 
----
+**Compatibility:** Supports Windows 10/11, WeChat 4.0 and above (NT framework) as well as legacy versions, and works with Claude, ChatGPT, and other AI assistants that support MCP.
 
-## 🤖 What is MCP?
+## Features
 
-> **Model Context Protocol (MCP)** is an open standard protocol for connecting AI assistants to various data sources and tools. It is like the USB-C port for AI applications, providing a standardized way to connect AI models to external systems.
+- MCP standard compliant, built on JSON-RPC 2.0
+- Sends WeChat text messages (Chinese, English, digits, emoji) with optional scheduled sending
+- Detects the WeChat version automatically and adapts to the NT framework (4.0 and above) or legacy versions
+- Smart input box positioning that adapts to different window sizes and layouts
+- Clipboard input that avoids input method interference, with automatic backup and restore of the user's clipboard
+- Multiple send shortcuts: Enter, Ctrl+Enter, Alt+S
+- Asynchronous processing that does not block the AI assistant, with full error handling and logging
 
-## 💻 Compatibility
-
-- ✅ **WeChat version** - Fully supports WeChat 4.0 and above (NT framework) as well as legacy WeChat versions
-- ✅ **Operating system** - Supports Windows 10/11
-- ✅ **AI assistants** - Compatible with Claude, ChatGPT, and other AI assistants that support the MCP protocol
-
-## ✨ Features
-
-- ✅ **MCP standard compliant** - Fully conforms to the MCP specification
-- ✅ **JSON-RPC 2.0** - Built on the standard JSON-RPC 2.0 protocol
-- ✅ **WeChat message sending** - Supports sending WeChat text messages
-- ✅ **Scheduled sending** - Supports sending messages on a delay
-- ✅ **Comprehensive version support** - Fully supports WeChat 4.0 and above (NT framework) as well as legacy WeChat versions
-- ✅ **Smart version detection** - Automatically detects the WeChat version and adapts its operation accordingly
-- ✅ **Smart input box positioning** - Adapts to the input box position across different window sizes and layouts
-- ✅ **Clipboard input technique** - Uses clipboard input to completely avoid input method (IME) state issues
-- ✅ **Multiple send methods** - Supports Enter, Ctrl+Enter, Alt+S, and other send shortcuts
-- ✅ **Asynchronous processing** - Runs asynchronously without blocking the AI assistant
-- ✅ **Complete logging** - Full error handling and log recording
-- ✅ **Partial text support** - Currently supports sending English, digits, emoji, and so on; Chinese messages are not yet supported (may cause garbled text)
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 WeChat-MCP-Server/
-├── 📂 src/
-│   ├── 📄 __init__.py
-│   ├── 📄 mcp_server.py          # Main MCP server implementation
-│   └── 📄 wechat_controller.py   # WeChat automation controller
-├── 📂 examples/
-│   └── 📄 mcp_client_example.py  # Client usage example
-├── 📂 docs/
-│   └── 📄 QUICK_START.md         # Quick start guide
-├── 📄 mcp_config.json           # MCP configuration file
-├── 📄 requirements.txt          # Dependency list
-├── 📄 LICENSE                   # License file
-├── 📄 AGENTS.md                 # Guidance for AI assistants
-├── 📄 README.md                 # Project documentation (Chinese)
-└── 📄 README.en.md              # Project documentation (English)
+├── src/
+│   ├── __init__.py
+│   ├── mcp_server.py          # Main MCP server implementation
+│   └── wechat_controller.py   # WeChat automation controller
+├── tests/
+│   ├── test_server.py         # Server functionality test
+│   └── test_send_chinese.py   # Chinese message sending test
+├── examples/
+│   └── mcp_client_example.py  # Client usage example
+├── docs/
+│   ├── QUICK_START.md         # Quick start guide (Chinese)
+│   └── QUICK_START.en.md      # Quick start guide (English)
+├── mcp_config.json            # MCP configuration file
+├── requirements.txt           # Dependency list
+├── LICENSE                    # License file
+├── AGENTS.md                  # Guidance for AI assistants
+├── README.md                  # Project documentation (Chinese)
+└── README.en.md               # Project documentation (English)
 ```
 
-## 🚀 Installation and Setup
+## Installation and Setup
 
-### 1️⃣ Install Dependencies
+### 1. Install Dependencies
 
 ```bash
-# Clone the project
 git clone https://github.com/hhuangpanda/WeChat-MCP-Server.git
 cd WeChat-MCP-Server
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2️⃣ Make Sure WeChat Is Running and Logged In
+### 2. Make Sure WeChat Is Running and Logged In
 
-> ⚠️ **Important**
-> 
-> Before use, make sure that:
-> - ✅ The WeChat client is installed and running
-> - ✅ You are successfully logged in to your WeChat account
-> - ✅ The WeChat window is visible (do not minimize it)
+Before use, make sure the WeChat client is running, logged in, and its window is visible (not minimized).
 
-
-
-
-### 3️⃣ Configure Your AI Assistant
+### 3. Configure Your AI Assistant
 
 Add this MCP server to your AI assistant's configuration. Using **Claude Desktop** as an example:
 
@@ -120,22 +82,19 @@ Add this MCP server to your AI assistant's configuration. Using **Claude Desktop
 }
 ```
 
-> **Note**: Replace `C:/path/to/WeChat-MCP-Server` with your actual project path
+Replace `C:/path/to/WeChat-MCP-Server` with your actual project path.
 
-## 🛠️ Available Tools
+## Available Tools
 
-### 📤 send_wechat_message
+### send_wechat_message
 
 Send a text message to a specified WeChat contact or group.
-
-**Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `contact_name` | `string` | ✅ | Contact or group name |
 | `message` | `string` | ✅ | Text message to send |
 
-**Example:**
 ```json
 {
   "name": "send_wechat_message",
@@ -146,11 +105,9 @@ Send a text message to a specified WeChat contact or group.
 }
 ```
 
-### ⏰ schedule_wechat_message
+### schedule_wechat_message
 
 Schedule a message to be sent after a specified delay.
-
-**Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
@@ -158,7 +115,6 @@ Schedule a message to be sent after a specified delay.
 | `message` | `string` | ✅ | Text message to send |
 | `delay_seconds` | `number` | ✅ | Delay before sending, in seconds |
 
-**Example:**
 ```json
 {
   "name": "schedule_wechat_message",
@@ -170,381 +126,78 @@ Schedule a message to be sent after a specified delay.
 }
 ```
 
-## 💡 Usage
+## Usage
 
-### 🤖 Using It in an AI Assistant
+Once configured, you can make requests to your AI assistant in natural language:
 
-Once configured, you can make requests directly to your AI assistant in natural language:
+- "Send Zhang San a WeChat message saying 'The meeting is postponed to 3 PM'"
+- "Remind me about the meeting in 10 minutes, and send it to the work group"
+- "Send today's work summary to File Transfer Assistant"
 
-> 💬 **Example conversations**
-> 
-> - "Send Zhang San a WeChat message saying 'The meeting is postponed to 3 PM'"
-> - "Remind me about the meeting in 10 minutes, and send it to the work group"
-> - "Send today's work summary to File Transfer Assistant"
-
-### 🧪 Direct Testing
-
-Run the example client to test:
-
-## 🔄 Automated Tasks and Message Reporting
-
-### 🚀 Automated Workflows with Cloud Code
-
-Imagine using automation tools such as Cloud Code to complete all kinds of tasks and automatically send report messages through WeChat:
-
-#### 📊 Example Automation Scenarios
-
-1. **Code deployment notifications**
-   - When a CI/CD pipeline finishes, automatically send the deployment status to the development team group
-   - Includes build results, test coverage, and deployment environment information
-
-2. **Monitoring alert integration**
-   - Push server monitoring alerts directly to the operations group
-   - System load and abnormal states are notified to the responsible people in real time
-
-3. **Data processing completion notifications**
-   - Automatically notify data analysts when a large data processing task completes
-   - Includes processing time, data volume, and a summary of results
-
-4. **Scheduled report delivery**
-   - Automatically generate daily/weekly business reports and send them to management
-   - Key metrics such as sales data and user growth are summarized automatically
-
-#### 💻 Implementation Example
-
-```python
-# Example: send a WeChat notification after GitHub Actions completes
-import requests
-
-def send_deployment_notification(status, details):
-    # Call the WeChat MCP Server API
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "tools/call",
-        "params": {
-            "name": "send_wechat_message",
-            "arguments": {
-                "contact_name": "技术团队群",
-                "message": f"🚀 部署状态: {status}\n📋 详情: {details}"
-            }
-        }
-    }
-    
-    response = requests.post("http://localhost:8080/mcp", json=payload)
-    return response.json()
-
-# Call from the CI/CD pipeline
-if __name__ == "__main__":
-    send_deployment_notification("成功", "版本v2.1.0已部署到生产环境")
-```
+Direct testing:
 
 ```bash
-cd examples
-python mcp_client_example.py
+python tests/test_server.py
+cd examples && python mcp_client_example.py
 ```
 
-## 🔧 MCP Protocol Implementation
+## MCP Protocol Implementation
 
-This server implements the following standard MCP methods:
+The server implements the following standard methods: `initialize` (initialize the connection), `tools/list` (list tools), and `tools/call` (call a tool).
 
-| Method | Description |
-|--------|-------------|
-| `initialize` | Initialize the server connection |
-| `tools/list` | List available tools |
-| `tools/call` | Call a specified tool |
+## Technical Architecture
 
-### 📡 JSON-RPC Message Format
+- **mcp_server.py**: Implements JSON-RPC 2.0, handles MCP method calls, and manages tool registration and execution
+- **wechat_controller.py**: Uses pyautogui and win32gui to control the WeChat window, detects the WeChat version (NT framework or legacy) automatically, inputs text through the clipboard, and supports asynchronous sending and scheduling
 
-<details>
-<summary>Click to view detailed message format examples</summary>
+## Notes
 
-**Request example:**
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "tools/call",
-  "params": {
-    "name": "send_wechat_message",
-    "arguments": {
-      "contact_name": "文件传输助手",
-      "message": "Hello World!"
-    }
-  },
-  "id": 1
-}
-```
-
-**Response example:**
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "content": [
-      {
-        "type": "text",
-        "text": "Successfully sent message to 文件传输助手: Hello World!"
-      }
-    ]
-  },
-  "id": 1
-}
-```
-
-</details>
-
-## 🏗️ Technical Architecture
-
-### 🖥️ MCP Server (mcp_server.py)
-- Implements the JSON-RPC 2.0 protocol
-- Handles standard MCP method calls
-- Manages tool registration and execution
-- Provides complete error handling
-
-### 📱 WeChat Controller (wechat_controller.py)
-- Uses pyautogui for UI automation
-- Uses win32gui to find and control the WeChat window
-- **🆕 NT framework support**: Fully supports WeChat 4.0 and above
-- **🔍 Smart version detection**: Automatically detects the WeChat version and adapts its operation
-- **🎯 Multi-window-type recognition**: Supports the QT framework and legacy window types
-- Supports asynchronous message sending and scheduling
-- Provides status checking
-
-#### 🔧 NT Framework Technical Features
-- **Version detection**: Detects the WeChat version automatically from process information
-- **Window recognition**: Supports pattern matching on QT framework window class names
-- **Operation adaptation**: Search and send logic optimized for the NT framework
-- **Compatibility**: Backward compatible with legacy WeChat versions (<4.0)
-
-#### 🎯 Smart Input Technique
-- **Smart positioning**: Adaptive detection of the input box position across window sizes
-- **Clipboard input**: Uses the Windows clipboard API for text input, completely avoiding IME interference
-- **Focus verification**: Verifies input box focus by typing a test character
-- **Clipboard protection**: Automatically backs up and restores the user's original clipboard content
-- **Multiple send fallbacks**: Supports Enter, Ctrl+Enter, Alt+S, and other send shortcuts as alternatives
-
-## ⚠️ Notes
-
-### 🖥️ System Requirements
-- **Operating system**: Windows
-- **WeChat version**: WeChat client (all versions supported, including 4.0 and above NT framework versions)
-- **Python version**: Python 3.8+
-
-### 🔐 Permission Requirements
+- Requires Windows, the WeChat client, and Python 3.8+
 - Requires screen control permission (pyautogui)
+- Do not operate the WeChat window manually while the tool is running, and make sure the window is visible and not obscured
+- Test with "File Transfer Assistant" first
+- Intended only for automating personal WeChat operations. Comply with the WeChat terms of use, and do not use it to send large volumes of messages
 
-### 📝 Usage Limitations
-> ⚠️ **Important**
-> 
-> - Do not operate the WeChat window manually while the tool is running
-> - Make sure the WeChat window is visible and not obscured
-> - It is recommended to test with "File Transfer Assistant" first
+## Troubleshooting
 
-### 🛡️ Security Considerations
-- This tool is intended only for automating personal WeChat operations
-- Please comply with the WeChat terms of use
-- It is not recommended for sending large volumes of messages
+- **WeChat window not found**: Make sure WeChat is running and logged in and the window is visible; restart WeChat if needed
+- **Message sending failed**: Check that the contact name is correct and the contact is in the recent chats list, and that the WeChat window is active
+- **Input box positioning failed**: Keep the WeChat window fully visible and not obscured
+- **MCP connection failed**: Check the Python environment, dependencies, and configuration file path, and read the server logs
 
-## 🔍 Troubleshooting
+## Development and Extension
 
-<details>
-<summary>📋 Common problems and solutions</summary>
+Adding a new tool:
 
-### ❌ WeChat Window Not Found
-- ✅ Make sure WeChat is running and logged in
-- ✅ Check that the WeChat window is visible
-- ✅ Try restarting WeChat
-
-### ❌ Message Sending Failed
-- ✅ Check that the contact name is correct
-- ✅ Make sure the contact is in the recent chats list
-- ✅ Verify that the WeChat window is active
-
-### ❌ Input Method Issues
-- ✅ **Resolved**: This project uses clipboard input, which completely avoids input method state issues
-- ✅ Supports Chinese, English, and emoji input under any input method state
-- ✅ Automatically protects the user's clipboard content and restores it after use
-
-### ❌ Input Box Positioning Failed
-- ✅ **Optimized**: The smart input box positioning system adapts to different window sizes
-- ✅ Supports multiple WeChat interface layouts and resolutions
-- ✅ Automatically tries several possible input box positions
-
-### ❌ MCP Connection Issues
-- ✅ Check the Python environment and dependencies
-- ✅ Verify the MCP configuration file path
-- ✅ Check the server log output
-
-</details>
-
-### 📊 Log Debugging
-
-The server outputs detailed log information, including:
-- ✅ Request processing status
-- ✅ WeChat operation results
-- ✅ Error messages and stack traces
-
-## 🚧 Development and Extension
-
-### ➕ Adding New Tools
-
-1. Add the tool definition in the `_register_tools()` method in `mcp_server.py`
+1. Add the tool definition in `_register_tools()` in `mcp_server.py`
 2. Implement the corresponding execution method
 3. Add the specific functionality in `wechat_controller.py`
 4. Update the configuration file and documentation
 
-### 🌐 Supporting Other Platforms
+The current version supports Windows only. Supporting other platforms requires replacing the win32gui-related code, adapting window management, and adjusting the keyboard shortcut mappings.
 
-The current version supports Windows only. To support other platforms, you need to:
-- Replace the win32gui-related code
-- Adapt window management for different systems
-- Adjust the keyboard shortcut mappings
+Roadmap:
 
-### 🗺️ Roadmap
-
-- [x] ~~Smart input box positioning~~ ✅ **Done**
-- [x] ~~Clipboard input technique~~ ✅ **Done**
-- [x] ~~Multiple send method support~~ ✅ **Done**
-- [x] ~~Input method compatibility issues~~ ✅ **Done**
 - [ ] Support macOS and Linux
 - [ ] Add more WeChat operations (such as sending images and files)
 
+## Important Disclaimer
 
-## ⚠️ Important Disclaimer
+This project involves WeChat automation and carries risk. Assess it yourself before use, and bear all consequences.
 
-> **🚨 Serious Warning**
-> 
-> This project involves WeChat automation and carries significant risks. Please assess the risks fully before use and bear all consequences yourself.
+- This project is for technical research and learning only. It has no affiliation with Tencent or WeChat and has not been authorized or endorsed by them
+- Using WeChat automation tools may violate the WeChat terms of service and can lead to your account being restricted, banned, or closed
+- It may cause message sending errors, data loss, or leakage, and a WeChat update may break the project at any time
+- Do not use it to send ads or spam in bulk, harass others, or for any purpose that violates laws and regulations
+- Assess the legal risks yourself before any commercial use
+- Developers, contributors, and distributors bear no responsibility for any consequences of using this project. Continued use means you accept these terms
 
-<details>
-<summary>📋 Click to view the full disclaimer</summary>
+## License
 
-### 🏷️ Nature of the Project
-1. **Pure technical research**: This project is created only for technical research and learning purposes, to demonstrate an implementation of the MCP protocol
-2. **Unofficial tool**: This project has no affiliation with Tencent or WeChat, and has not been authorized or endorsed by WeChat
-3. **Experimental**: This project is experimental code, with no guarantee of stability, security, or reliability
+This project is released under the **MIT License**, which allows commercial use, modification, distribution, and private use, provided the copyright and license notices are kept. The MIT License legally permits commercial use, but commercial use of WeChat automation tools carries high risk, which the user bears.
 
-### ⚠️ Usage Risk Warnings
-1. **Account risk**: Using any WeChat automation tool may cause your account to be restricted, banned, or permanently closed
-2. **Data risk**: May lead to loss of chat history, leakage of contact information, or other data security problems
-3. **System risk**: May cause instability or security vulnerabilities in your computer system
-4. **Legal risk**: In some regions or circumstances, using such tools may violate relevant laws and regulations
-5. **Privacy risk**: May involve the processing and transmission of personal private information
+## Contributing
 
-### 📱 WeChat-Related Disclaimers
-1. **Violation of terms of service**: Using this project may violate the WeChat user service agreement and terms of use
-2. **Loss of functionality**: A WeChat update may render this project completely non-functional at any time
-3. **Official sanctions**: Tencent has the right to take any action against accounts that use automation tools
-4. **No official support**: WeChat will not provide technical support for any problems arising from the use of this project
+Report bugs or suggest features through [Issues](https://github.com/hhuangpanda/WeChat-MCP-Server/issues), with detailed error messages and steps to reproduce.
 
-### 🔴 Full Disclaimer of Liability
-
-**Developers, contributors, and distributors bear no responsibility under any circumstances, including but not limited to:**
-
-#### Disclaimer of Direct Liability
-- WeChat account being banned, restricted, or closed
-- Loss, leakage, or misuse of personal data
-- Damage to the computer system or data corruption
-- Message sending errors or failures
-- Leakage of private information
-- Financial or business losses
-
-#### Disclaimer of Indirect Liability
-- Any third-party losses caused by using this project
-- Consequential losses caused by defects in the project
-- Legal consequences arising from violations of laws and regulations
-- Penalties arising from violations of platform rules
-- Any form of emotional distress or reputational damage
-
-#### Disclaimer of Legal Liability
-- Liability for violating local laws and regulations
-- Liability for violating the WeChat terms of service
-- Liability for infringing the rights of others
-- Liability for violating data protection regulations
-- Any civil, criminal, or administrative liability
-
-### 📋 Conditions of Use
-**By using this project, you:**
-1. Have fully understood and accepted all of the above risks and disclaimers
-2. Agree to bear all risks and consequences of using this project yourself
-3. Promise not to hold the developers responsible for any problems arising from the use of this project
-4. Understand that the developers may stop maintaining the project at any time without any liability
-5. Agree that the developers bear no responsibility in the event of any dispute
-
-### ⛔ Prohibited Use
-**Use of this project is strictly prohibited in the following cases:**
-- Sending advertisements or spam in bulk
-- Harassing others or malicious use
-- Purposes that violate local laws and regulations
-- Actions that infringe the rights of others
-- Actions that violate the WeChat terms of service
-
-### 💼 Commercial Use Warning
-**Although the MIT license permits commercial use, we strongly recommend:**
-- Fully assess the legal risks before commercial use
-- Ensure compliance with the relevant laws and regulations in your region
-- Comply with the WeChat platform's commercial use policies
-- Consult a legal professional
-- All risks arising from commercial use are borne by the user
-
-**If you do not agree with any of the above terms, stop downloading, installing, or using this project immediately. Continued use is deemed full agreement with and acceptance of all disclaimers.**
-
-</details>
-
----
-
-## 📄 License
-
-This project is released under the **MIT License**.
-
-<details>
-<summary>📋 License details</summary>
-
-The MIT License allows:
-- ✅ **Commercial use** (⚠️ assess the risks)
-- ✅ Modifying the code
-- ✅ Distributing the code
-- ✅ Private use
-
-But requires:
-- 📋 Retaining the copyright notice
-- 📋 Retaining the license notice
-
-**Important reminder**: 
-- ✅ The MIT License legally permits commercial use
-- ⚠️ However, commercial use of WeChat automation tools carries high risk
-- 🔍 Consult a legal professional before commercial use
-- 📋 All risks of commercial use are borne by the user
-
-</details>
-
-## 🤝 Contributing
-
-We welcome contributions of all kinds!
-
-### 🐛 Reporting Issues
-- Use [Issues](https://github.com/hhuangpanda/WeChat-MCP-Server/issues) to report bugs
-- Provide detailed error messages and steps to reproduce
-
-### 💡 Feature Suggestions
-- Suggest new features in [Issues](https://github.com/hhuangpanda/WeChat-MCP-Server/issues)
-- Describe the feature requirements and use cases in detail
-
-### 🔧 Code Contributions
-1. Fork this project
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Create a Pull Request
-
----
-
-<div align="center">
-
-**Thank you for using WeChat MCP Server!**
-
-If this project helps you, please consider giving us a ⭐
-
-[Back to top](#wechat-mcp-server)
-
-</div>
+Code contributions: fork the project, create a feature branch, commit your changes, and open a Pull Request.

@@ -1,12 +1,14 @@
 # 快速开始指南
 
+**简体中文** | [English](QUICK_START.en.md)
+
 ## 5分钟快速部署WeChat MCP服务器
 
 ### 步骤1: 环境准备
 
 1. **确保Python环境**
    ```bash
-   python --version  # 需要Python 3.7+
+   python --version  # 需要Python 3.8+
    ```
 
 2. **安装依赖包**
@@ -119,8 +121,6 @@ logging.basicConfig(level=logging.DEBUG)  # 更详细的日志
 ### 下一步
 
 - 阅读完整的 [README.md](../README.md) 了解更多功能
-- 查看 [API文档](API.md) 了解所有可用工具
-- 参考 [开发指南](DEVELOPMENT.md) 进行自定义开发
 
 ### 获得帮助
 
