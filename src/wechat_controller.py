@@ -438,6 +438,12 @@ class WeChatController:
             self.logger.error(f"Error scheduling message: {e}")
             return False
     
+    def default_test_contact(self) -> str:
+        """按客户端语言（窗口标题）返回测试联系人：中文版 文件传输助手，英文版 File。"""
+        hwnd = self._find_wechat_window()
+        title = win32gui.GetWindowText(hwnd) if hwnd else ""
+        return "文件传输助手" if "微信" in title else "File"
+
     def get_status(self) -> Dict[str, Any]:
         """获取微信控制器的当前状态。"""
         try:

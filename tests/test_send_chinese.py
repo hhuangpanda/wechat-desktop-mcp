@@ -24,7 +24,7 @@ async def main():
         return
 
     # 测试中文发送
-    contact = "文件传输助手"
+    contact = sys.argv[1] if len(sys.argv) > 1 else controller.default_test_contact()
     message = "你好，这是一条中文测试消息"
     
     print(f"Sending message to {contact}: {message}")
