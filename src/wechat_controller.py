@@ -451,6 +451,8 @@ class WeChatController:
                 return False
             cx, cy = win32gui.ScreenToClient(hwnd, ((rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2))
             lparam = win32api.MAKELONG(cx & 0xFFFF, cy & 0xFFFF)
+            # A click on a window Qt thinks is inactive makes WeChat activate itself; a sent WM_SETFOCUS avoids that
+            win32gui.SendMessage(hwnd, win32con.WM_SETFOCUS, 0, 0)
             win32gui.PostMessage(hwnd, win32con.WM_MOUSEMOVE, 0, lparam)
             # Freshly shown rows (search results) ignore a click until they have seen hover
             time.sleep(0.1)
@@ -661,8 +663,7 @@ class WeChatController:
             listing = self._uia_find(root, UIA.UIA_AutomationIdPropertyId, "search_list")
             return [(e, e.CurrentAutomationId or "", e.CurrentName) for e in self._uia_children(listing)] if listing else []
 
-        # WeChat only shows search results while it believes it has focus; a sent WM_SETFOCUS does that without activating it
-        win32gui.SendMessage(hwnd, win32con.WM_SETFOCUS, 0, 0)
+        # WeChat only shows search results while it believes it has focus, which _post_click provides
         if not self._post_click(hwnd, search):
             return None
         time.sleep(0.2)
@@ -693,6 +694,7 @@ class WeChatController:
             # No Escape: outside the search box it can hide WeChat to the tray. Typing clicks the input box, which closes the search
             self._clear_field(hwnd, search)
             return chat_name
+        # Closing the results popup makes WeChat activate itself; the caller hands focus back
         if self._post_click(hwnd, target) and self._wait_for(lambda: self._uia_current_chat(root) == chat_name, 2.0):
             return chat_name
         self._clear_field(hwnd, search)
