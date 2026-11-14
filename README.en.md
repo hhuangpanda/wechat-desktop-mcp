@@ -23,9 +23,9 @@
 - MCP standard compliant, built on JSON-RPC 2.0
 - Sends WeChat text messages (Chinese, English, digits, emoji) with optional scheduled sending
 - Detects the WeChat version automatically and adapts to the NT framework (4.0 and above) or legacy versions
-- Smart input box positioning that adapts to different window sizes and layouts
-- Clipboard input that avoids input method interference, with automatic backup and restore of the user's clipboard
-- Multiple send shortcuts: Enter, Ctrl+Enter, Alt+S
+- Works in the background through Windows UI Automation and window messages: does not move the mouse or take keyboard focus, so you can keep using other windows while it sends
+- Verifies each send by reading the message back from the chat, retries each step once, and returns a clear error when sending fails
+- Falls back to keyboard and clipboard input on WeChat builds without an accessibility tree (that mode needs the foreground and cannot verify delivery)
 - Asynchronous processing that does not block the AI assistant, with full error handling and logging
 
 ## Project Structure
@@ -52,7 +52,7 @@ pip install -r requirements.txt
 
 ### 2. Make Sure WeChat Is Running and Logged In
 
-Before use, make sure the WeChat client is running, logged in, and its window is visible (not minimized).
+Before use, make sure the WeChat client is running and logged in. The window can be behind other windows or minimized, but not closed to the system tray.
 
 ### 3. Configure Your AI Assistant
 
@@ -92,6 +92,8 @@ Send a text message to a specified WeChat contact or group.
   }
 }
 ```
+
+On success it returns `Message sent and verified in chat '<chat name>'`, followed by `(retried: ...)` if any step needed a retry. On failure the result has `isError: true` and text such as `Failed to send message (stage=open_chat, reason=contact_not_found_or_chat_not_opened, retries=[...], ...)`, where `stage` is the step that failed (`find_window`, `open_chat`, `set_text`, `click_send`, `verify`).
 
 ### schedule_wechat_message
 
@@ -135,7 +137,7 @@ The list is held in memory, covers only messages scheduled through this server p
       "contact_name": "文件传输助手",
       "message": "Earlier message",
       "scheduled_for": "2026-11-01T14:30:00-05:00",
-      "result": "Message sent successfully"
+      "result": "Message sent and verified in chat '文件传输助手'"
     }
   ]
 }
@@ -156,6 +158,12 @@ python tests/test_server.py
 cd examples && python mcp_client_example.py
 ```
 
+End-to-end test (sends real messages to File Transfer while another process simulates clicking and typing; do not use the mouse or keyboard while it runs):
+
+```bash
+python tests/e2e_interference.py
+```
+
 ## MCP Protocol Implementation
 
 The server implements the following standard methods: `initialize` (initialize the connection), `tools/list` (list tools), and `tools/call` (call a tool).
@@ -163,21 +171,23 @@ The server implements the following standard methods: `initialize` (initialize t
 ## Technical Architecture
 
 - **mcp_server.py**: Implements JSON-RPC 2.0, handles MCP method calls, and manages tool registration and execution
-- **wechat_controller.py**: Uses pyautogui and win32gui to control the WeChat window, detects the WeChat version (NT framework or legacy) automatically, inputs text through the clipboard, and supports asynchronous sending and scheduling
+- **wechat_controller.py**: Opens the chat, enters the text and clicks Send through UI Automation (comtypes) and posted window messages, then confirms the message appears in the chat; falls back to pyautogui keyboard input when WeChat exposes no accessibility tree; supports scheduled sending
 
 ## Notes
 
 - Requires Windows, the WeChat client, and Python 3.8+
-- Requires screen control permission (pyautogui)
-- Do not operate the WeChat window manually while the tool is running, and make sure the window is visible and not obscured
+- Messages containing emoji or line breaks are pasted in the background: the clipboard is used for a moment and then restored with all its formats, and the message is kept out of Windows clipboard history. If the clipboard holds something that cannot be restored exactly (such as copied files), it is left alone and the text is typed instead
+- Only if those methods fail is the text set through UI Automation, which activates WeChat for a moment; focus is handed straight back, and the text is checked again before sending
+- Clicking into WeChat yourself while a message is being sent can interrupt it; the tool then reports a failure instead of sending the wrong text
+- Any unsent draft in the recipient's chat is cleared before the message is typed; drafts in other chats are not touched
+- If WeChat is minimized, it is shown (without taking focus) for the duration of the send and minimized again afterwards
 - Test with "File Transfer Assistant" first
 - Intended only for automating personal WeChat operations. Comply with the WeChat terms of use, and do not use it to send large volumes of messages
 
 ## Troubleshooting
 
 - **WeChat window not found**: Make sure WeChat is running and logged in and the window is visible; restart WeChat if needed
-- **Message sending failed**: Check that the contact name is correct and the contact is in the recent chats list, and that the WeChat window is active
-- **Input box positioning failed**: Keep the WeChat window fully visible and not obscured
+- **Message sending failed**: The error's `stage` shows which step failed. `open_chat` usually means the contact name matched no search result; check the name as WeChat displays it
 - **MCP connection failed**: Check the Python environment, dependencies, and configuration file path, and read the server logs
 
 ## Development and Extension

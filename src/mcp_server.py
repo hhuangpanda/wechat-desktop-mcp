@@ -204,13 +204,18 @@ class MCPServer:
         """将发送结果转换为工具返回的文本。"""
         success = send_result if isinstance(send_result, bool) else bool(send_result.get("ok"))
         if success:
-            return "Message sent successfully"
+            if isinstance(send_result, dict) and send_result.get("verified"):
+                retries = send_result.get("retry_used")
+                suffix = f" (retried: {', '.join(retries)})" if retries else ""
+                return f"Message sent and verified in chat '{send_result.get('chat_name')}'{suffix}"
+            return "Message sent via keyboard fallback; delivery could not be verified"
         if isinstance(send_result, dict):
             stage = send_result.get("stage")
             reason = send_result.get("reason")
             version = send_result.get("wechat_version")
             is_nt = send_result.get("is_nt_framework")
-            return f"Failed to send message (stage={stage}, reason={reason}, wechat_version={version}, nt={is_nt})"
+            retries = send_result.get("retry_used")
+            return f"Failed to send message (stage={stage}, reason={reason}, retries={retries}, wechat_version={version}, nt={is_nt})"
         return "Failed to send message"
 
     async def _execute_send_message(self, arguments: Dict[str, Any], request_id: Optional[Union[str, int]]) -> Dict[str, Any]:
@@ -238,7 +243,8 @@ class MCPServer:
                         "type": "text",
                         "text": self._format_send_result(send_result)
                     }
-                ]
+                ],
+                "isError": not send_result.get("ok")
             }
 
             return JSONRPCResponse(result=result, id=request_id).to_dict()

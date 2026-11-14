@@ -33,7 +33,7 @@ async def fake_send(self, contact_name, message):
                 "wechat_version": None, "is_nt_framework": False}
     if contact_name == "raise":
         raise RuntimeError("boom")
-    return {"ok": True}
+    return {"ok": True, "verified": True, "chat_name": contact_name}
 
 
 async def test_show_scheduled():
@@ -56,9 +56,9 @@ async def test_show_scheduled():
     shown = await show(server)
     assert [entry["contact_name"] for entry in shown["pending"]] == ["later"]
     results = {entry["contact_name"]: entry["result"] for entry in shown["recent"]}
-    assert results["ok"] == "Message sent successfully"
+    assert results["ok"] == "Message sent and verified in chat 'ok'"
     assert results["fail"] == ("Failed to send message (stage=find_window, "
-                               "reason=wechat_window_not_found, wechat_version=None, nt=False)")
+                               "reason=wechat_window_not_found, retries=None, wechat_version=None, nt=False)")
     assert results["raise"].startswith("Failed to send message (stage=exception, reason=boom")
 
     text = await call(server, "schedule_wechat_message",

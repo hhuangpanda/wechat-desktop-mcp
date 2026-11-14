@@ -89,8 +89,7 @@ Try the following commands in your AI assistant:
 #### Problem 1: WeChat window not found
 **Solution:**
 - Make sure WeChat is running
-- Check that the WeChat window is visible
-- Try clicking the WeChat window to give it focus
+- Make sure the WeChat window is open (it can be minimized or behind other windows, but not closed to the system tray)
 
 #### Problem 2: Contact not found
 **Solution:**

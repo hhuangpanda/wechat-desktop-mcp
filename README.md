@@ -23,9 +23,9 @@
 - 符合 MCP 标准，基于 JSON-RPC 2.0
 - 发送微信文本消息（支持中文、英文、数字、表情符号）和定时发送
 - 自动检测微信版本，适配4.0以上的NT框架版本和传统版本
-- 智能输入框定位，适配不同窗口大小和布局
-- 剪贴板输入，避免输入法干扰，并自动备份和恢复用户剪贴板
-- 支持 Enter、Ctrl+Enter、Alt+S 等多种发送快捷键
+- 通过 Windows UI 自动化和窗口消息在后台发送：不移动鼠标、不抢占键盘焦点，发送期间可以继续使用其他窗口
+- 发送后从聊天记录中读回消息进行确认，每个步骤失败时重试一次，最终失败时返回明确的错误
+- 对于没有无障碍树的微信版本，回退到键盘和剪贴板输入（该模式需要前台窗口，且无法确认是否送达）
 - 异步处理，不阻塞AI助手；完整的错误处理和日志
 
 ## 项目结构
@@ -52,7 +52,7 @@ pip install -r requirements.txt
 
 ### 2. 确保微信已启动并登录
 
-使用前请确保微信客户端正在运行、已登录，且窗口可见（不要最小化）。
+使用前请确保微信客户端正在运行并已登录。窗口可以被其他窗口遮挡或最小化，但不能关闭到系统托盘。
 
 ### 3. 配置AI助手
 
@@ -92,6 +92,8 @@ pip install -r requirements.txt
   }
 }
 ```
+
+成功时返回 `Message sent and verified in chat '<聊天名称>'`，如有步骤经过重试，后面会附加 `(retried: ...)`。失败时结果带有 `isError: true`，文本类似 `Failed to send message (stage=open_chat, reason=contact_not_found_or_chat_not_opened, retries=[...], ...)`，其中 `stage` 为失败的步骤（`find_window`、`open_chat`、`set_text`、`click_send`、`verify`）。
 
 ### schedule_wechat_message
 
@@ -135,7 +137,7 @@ pip install -r requirements.txt
       "contact_name": "文件传输助手",
       "message": "Earlier message",
       "scheduled_for": "2026-11-01T14:30:00-05:00",
-      "result": "Message sent successfully"
+      "result": "Message sent and verified in chat '文件传输助手'"
     }
   ]
 }
@@ -156,6 +158,12 @@ python tests/test_server.py
 cd examples && python mcp_client_example.py
 ```
 
+端到端测试（向文件传输助手发送真实消息，同时由另一个进程模拟点击和打字；运行期间请勿使用鼠标和键盘）：
+
+```bash
+python tests/e2e_interference.py
+```
+
 ## MCP协议实现
 
 服务器实现了以下标准方法：`initialize`（初始化连接）、`tools/list`（列出工具）、`tools/call`（调用工具）。
@@ -163,21 +171,23 @@ cd examples && python mcp_client_example.py
 ## 技术架构
 
 - **mcp_server.py**：实现 JSON-RPC 2.0，处理MCP方法调用，管理工具注册和执行
-- **wechat_controller.py**：使用 pyautogui 和 win32gui 控制微信窗口，自动检测微信版本（NT框架或传统版本），通过剪贴板输入文本，支持异步发送和调度
+- **wechat_controller.py**：通过 UI 自动化（comtypes）和投递的窗口消息打开聊天、输入文本并点击发送，再确认消息出现在聊天中；微信不提供无障碍树时回退到 pyautogui 键盘输入；支持定时发送
 
 ## 注意事项
 
 - 需要 Windows 系统、微信客户端和 Python 3.8+
-- 需要屏幕控制权限（pyautogui）
-- 使用期间请勿手动操作微信窗口，并确保窗口可见且未被遮挡
+- 包含表情符号或换行的消息在后台粘贴：短暂使用剪贴板后恢复其全部格式，且消息不会进入 Windows 剪贴板历史记录。如果剪贴板中的内容无法完整恢复（例如复制的文件），则不使用剪贴板，改为逐字输入
+- 只有上述方法都失败时，才通过 UI 自动化设置文本，会短暂激活微信；焦点会立即交还，发送前会再次核对文本
+- 发送期间如果你自己点击微信窗口，可能会打断发送；此时工具会报告失败，而不会发送错误的文本
+- 输入消息前会清空收件人聊天中未发送的草稿；其他聊天的草稿不受影响
+- 如果微信已最小化，发送期间会显示窗口（不抢占焦点），发送完成后重新最小化
 - 建议先向"文件传输助手"测试
 - 仅用于自动化个人微信操作，请遵守微信使用条款，不建议用于大量消息发送
 
 ## 故障排除
 
 - **找不到微信窗口**：确认微信已启动并登录、窗口可见，必要时重启微信
-- **消息发送失败**：确认联系人名称正确且在最近聊天列表中，微信窗口处于活动状态
-- **输入框定位失败**：保持微信窗口完整可见，不要被遮挡
+- **消息发送失败**：错误中的 `stage` 指出失败的步骤。`open_chat` 通常表示联系人名称没有匹配到搜索结果，请按微信中显示的名称检查
 - **MCP连接失败**：检查Python环境、依赖包和配置文件路径，查看服务器日志
 
 ## 开发和扩展

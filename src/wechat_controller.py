@@ -6,12 +6,20 @@
 """
 
 import asyncio
+import ctypes
+import itertools
 import logging
 import time
 import uuid
 from collections import deque
 from datetime import datetime, timedelta
-from typing import Any, Deque, Dict, List, Optional
+from typing import Any, Callable, Deque, Dict, List, Optional
+
+# Per-monitor DPI awareness so UIA rectangles and posted click coordinates are both physical pixels; must precede pyautogui
+try:
+    ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+except Exception:
+    pass
 
 import psutil
 import pyautogui
@@ -19,6 +27,15 @@ import win32api
 import win32con
 import win32gui
 import win32clipboard
+
+VK_PACKET = 0xE7
+
+try:
+    import comtypes.client
+    comtypes.client.GetModule("UIAutomationCore.dll")
+    from comtypes.gen import UIAutomationClient as UIA
+except Exception:
+    UIA = None
 
 class WeChatController:
     """微信自动化操作控制器（仅 NT 版本）。"""
@@ -86,11 +103,17 @@ class WeChatController:
     def _find_wechat_window(self) -> Optional[int]:
         import re
 
+        import win32process
+
         nt_windows = []
         legacy_windows = []
+        # Title matching alone also hits other apps, e.g. an editor showing a path containing "WeChat"
+        wechat_pids = {p.pid for p in psutil.process_iter(['name']) if (p.info.get('name') or "").lower() in ("weixin.exe", "wechat.exe")}
 
         def enum_windows_callback(hwnd, _):
             if not win32gui.IsWindowVisible(hwnd):
+                return True
+            if win32process.GetWindowThreadProcessId(hwnd)[1] not in wechat_pids:
                 return True
             class_name = win32gui.GetClassName(hwnd)
             window_text = win32gui.GetWindowText(hwnd)
@@ -371,6 +394,404 @@ class WeChatController:
             self.logger.error(f"Failed to send text in NT: {e}")
             return False
     
+    # --- UI Automation path: no foreground, real cursor, keyboard or clipboard use ---
+
+    @staticmethod
+    def _normalize(text: Optional[str]) -> str:
+        return " ".join((text or "").split())
+
+    @staticmethod
+    def _wait_for(check: Callable[[], Any], timeout: float, interval: float = 0.15) -> Any:
+        deadline = time.monotonic() + timeout
+        while True:
+            value = check()
+            if value or time.monotonic() >= deadline:
+                return value
+            time.sleep(interval)
+
+    def _uia_client(self):
+        if UIA is None:
+            return None
+        if getattr(self, "_uia", None) is None:
+            self._uia = comtypes.client.CreateObject(UIA.CUIAutomation, interface=UIA.IUIAutomation)
+        return self._uia
+
+    def _uia_find(self, root, prop_id: int, value: str):
+        try:
+            return root.FindFirst(UIA.TreeScope_Descendants, self._uia.CreatePropertyCondition(prop_id, value))
+        except Exception:
+            return None
+
+    def _uia_children(self, element) -> list:
+        try:
+            found = element.FindAll(UIA.TreeScope_Children, self._uia.CreateTrueCondition())
+            return [found.GetElement(i) for i in range(found.Length)]
+        except Exception:
+            return []
+
+    def _uia_value(self, element) -> Optional[str]:
+        try:
+            return element.GetCurrentPattern(UIA.UIA_ValuePatternId).QueryInterface(UIA.IUIAutomationValuePattern).CurrentValue
+        except Exception:
+            return None
+
+    def _uia_set_value(self, element, text: str) -> bool:
+        try:
+            element.GetCurrentPattern(UIA.UIA_ValuePatternId).QueryInterface(UIA.IUIAutomationValuePattern).SetValue(text)
+            return True
+        except Exception as e:
+            self.logger.error(f"UIA SetValue failed: {e}")
+            return False
+
+    def _post_click(self, hwnd: int, element) -> bool:
+        """Click via posted window messages; WeChat need not be foreground or uncovered."""
+        try:
+            rect = element.CurrentBoundingRectangle
+            if rect.right <= rect.left or rect.bottom <= rect.top:
+                return False
+            cx, cy = win32gui.ScreenToClient(hwnd, ((rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2))
+            lparam = win32api.MAKELONG(cx & 0xFFFF, cy & 0xFFFF)
+            win32gui.PostMessage(hwnd, win32con.WM_MOUSEMOVE, 0, lparam)
+            # Freshly shown rows (search results) ignore a click until they have seen hover
+            time.sleep(0.1)
+            win32gui.PostMessage(hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, lparam)
+            win32gui.PostMessage(hwnd, win32con.WM_LBUTTONUP, 0, lparam)
+            return True
+        except Exception as e:
+            self.logger.error(f"Posted click failed: {e}")
+            return False
+
+    def _uia_chat_ui_available(self, hwnd: int) -> bool:
+        if self._uia_client() is None:
+            return False
+        root = self._uia.ElementFromHandle(hwnd)
+        return self._uia_find(root, UIA.UIA_AutomationIdPropertyId, "session_list") is not None
+
+    def _uia_current_chat(self, root) -> Optional[str]:
+        field = self._uia_find(root, UIA.UIA_AutomationIdPropertyId, "chat_input_field")
+        return field.CurrentName if field else None
+
+    def _uia_bubbles(self, root) -> List[str]:
+        messages = self._uia_find(root, UIA.UIA_AutomationIdPropertyId, "chat_message_list")
+        if not messages:
+            return []
+        # ChatItemView rows are timestamps
+        return [self._normalize(e.CurrentName) for e in self._uia_children(messages) if e.CurrentClassName != "mmui::ChatItemView"]
+
+    @staticmethod
+    def _post_key(hwnd: int, vk: int, count: int = 1) -> None:
+        for _ in range(count):
+            win32gui.PostMessage(hwnd, win32con.WM_KEYDOWN, vk, 1)
+            win32gui.PostMessage(hwnd, win32con.WM_KEYUP, vk, 0xC0000001)
+
+    def _post_text(self, hwnd: int, field, text: str) -> bool:
+        """Type by posted WM_CHAR. Emoji need a VK_PACKET key-down per UTF-16 unit, and WeChat
+        inserts them ahead of pending plain text, so each run is confirmed before the next."""
+        typed = self._uia_value(field) or ""
+        for wide, run in itertools.groupby(text, key=lambda ch: ord(ch) > 0xFFFF):
+            run = "".join(run)
+            data = run.encode("utf-16-le")
+            if wide:
+                # VK_PACKET input is only accepted while WeChat believes it has focus
+                win32gui.SendMessage(hwnd, win32con.WM_SETFOCUS, 0, 0)
+            for i in range(0, len(data), 2):
+                unit = int.from_bytes(data[i:i + 2], "little")
+                if wide:
+                    win32gui.PostMessage(hwnd, win32con.WM_KEYDOWN, VK_PACKET, 1)
+                win32gui.PostMessage(hwnd, win32con.WM_CHAR, unit, 1)
+                if wide:
+                    win32gui.PostMessage(hwnd, win32con.WM_KEYUP, VK_PACKET, 0xC0000001)
+            typed += run
+            if not self._wait_for(lambda: self._uia_value(field) == typed, 0.6 if wide else 1.5, 0.05):
+                return False
+        return True
+
+    def _restore_foreground(self, hwnd: int, previous: int) -> None:
+        """Hand focus back to the user's window after WeChat had to be activated."""
+        if not previous or previous == hwnd or not win32gui.IsWindow(previous) or win32gui.GetForegroundWindow() != hwnd:
+            return
+        import win32process
+        wechat_thread = win32process.GetWindowThreadProcessId(hwnd)[0]
+        current_thread = win32api.GetCurrentThreadId()
+        ctypes.windll.user32.AttachThreadInput(current_thread, wechat_thread, True)
+        try:
+            win32gui.SetForegroundWindow(previous)
+        except Exception:
+            pass
+        finally:
+            ctypes.windll.user32.AttachThreadInput(current_thread, wechat_thread, False)
+
+    def _open_chat_from_list(self, hwnd: int, root, contact_name: str) -> Optional[str]:
+        """Background click on a visible chat list row; WeChat is not activated."""
+        if self._uia_current_chat(root) == contact_name:
+            return contact_name
+        item = self._uia_find(root, UIA.UIA_AutomationIdPropertyId, f"session_item_{contact_name}")
+        listing = self._uia_find(root, UIA.UIA_AutomationIdPropertyId, "session_list")
+        if not item or not listing:
+            return None
+        row, area = item.CurrentBoundingRectangle, listing.CurrentBoundingRectangle
+        if row.top < area.top or row.bottom > area.bottom:
+            return None
+        if self._post_click(hwnd, item) and self._wait_for(lambda: self._uia_current_chat(root) == contact_name, 2.0):
+            return contact_name
+        return None
+
+    def _with_wechat_keys(self, hwnd: int, vks: List[int], action: Callable[[], Any]) -> Any:
+        """Run action with vks held in WeChat's thread key state only; the real keyboard is untouched.
+        Qt reads modifiers from this state, so posted keys then act as Ctrl+V or Shift+Enter."""
+        import win32process
+        wechat_thread = win32process.GetWindowThreadProcessId(hwnd)[0]
+        current_thread = win32api.GetCurrentThreadId()
+        user32 = ctypes.windll.user32
+        if not user32.AttachThreadInput(current_thread, wechat_thread, True):
+            return None
+        state = (ctypes.c_ubyte * 256)()
+        user32.GetKeyboardState(state)
+        saved = bytes(state)
+        try:
+            for vk in vks:
+                state[vk] |= 0x80
+            user32.SetKeyboardState(state)
+            return action()
+        finally:
+            user32.SetKeyboardState((ctypes.c_ubyte * 256)(*saved))
+            user32.AttachThreadInput(current_thread, wechat_thread, False)
+
+    def _field_equals(self, field, text: str) -> Callable[[], bool]:
+        return lambda: (self._uia_value(field) or "").replace("\r", "\n") == text
+
+    @staticmethod
+    def _clipboard_snapshot() -> Optional[List[tuple]]:
+        """Every clipboard format as restorable data, or None if something (e.g. copied files) cannot be restored exactly."""
+        # Windows recreates these from the formats that are kept
+        synthesized = {win32con.CF_TEXT, win32con.CF_OEMTEXT, win32con.CF_LOCALE, win32con.CF_BITMAP, win32con.CF_DIBV5}
+        win32clipboard.OpenClipboard()
+        try:
+            saved, fmt = [], 0
+            while True:
+                fmt = win32clipboard.EnumClipboardFormats(fmt)
+                if not fmt:
+                    return saved
+                if fmt in synthesized:
+                    continue
+                data = win32clipboard.GetClipboardData(fmt)
+                if not isinstance(data, (bytes, str)):
+                    return None
+                saved.append((fmt, data))
+        except Exception:
+            return None
+        finally:
+            win32clipboard.CloseClipboard()
+
+    @staticmethod
+    def _clipboard_put(entries: List[tuple]) -> None:
+        win32clipboard.OpenClipboard()
+        try:
+            win32clipboard.EmptyClipboard()
+            for fmt, data in entries:
+                win32clipboard.SetClipboardData(fmt, data)
+        finally:
+            win32clipboard.CloseClipboard()
+
+    def _paste_text(self, hwnd: int, field, text: str) -> bool:
+        """Paste via clipboard and a background Ctrl+V; the user's clipboard is restored afterwards."""
+        snapshot = self._clipboard_snapshot()
+        if snapshot is None:
+            return False
+        # Keeps the message out of Windows clipboard history and cloud sync
+        exclude = win32clipboard.RegisterClipboardFormat("ExcludeClipboardContentFromMonitorProcessing")
+        try:
+            self._clipboard_put([(win32con.CF_UNICODETEXT, text), (exclude, b"\0")])
+
+            def paste():
+                self._post_key(hwnd, ord("V"))
+                return self._wait_for(self._field_equals(field, text), 1.5, 0.05)
+
+            return bool(self._with_wechat_keys(hwnd, [win32con.VK_CONTROL, win32con.VK_LCONTROL], paste))
+        except Exception as e:
+            self.logger.error(f"Clipboard paste failed: {e}")
+            return False
+        finally:
+            try:
+                self._clipboard_put(snapshot)
+            except Exception as e:
+                self.logger.error(f"Failed to restore clipboard: {e}")
+
+    def _type_lines(self, hwnd: int, field, text: str) -> bool:
+        """Posted typing with a background Shift+Enter for each line break."""
+        lines = text.split("\n")
+        for i, line in enumerate(lines):
+            if line and not self._post_text(hwnd, field, line):
+                return False
+            if i < len(lines) - 1:
+                expected = "\n".join(lines[:i + 1]) + "\n"
+
+                def newline():
+                    self._post_key(hwnd, win32con.VK_RETURN)
+                    return self._wait_for(self._field_equals(field, expected), 1.0, 0.05)
+
+                if not self._with_wechat_keys(hwnd, [win32con.VK_SHIFT, win32con.VK_LSHIFT], newline):
+                    return False
+        return True
+
+    def _enter_text(self, hwnd: int, field, text: str, previous_foreground: int) -> None:
+        """Type into a field that already has focus inside WeChat, trying the background methods first."""
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        if not any(ord(ch) > 0xFFFF or ch in "\n\t" for ch in text):
+            if self._post_text(hwnd, field, text):
+                return
+        else:
+            # Emoji and line breaks: posted characters cannot carry them reliably
+            if self._paste_text(hwnd, field, text):
+                return
+            self._clear_field(hwnd, field)
+            if "\t" not in text and self._type_lines(hwnd, field, text):
+                return
+        # Last resort: SetValue is reliable but activates WeChat, so hand focus straight back
+        self._clear_field(hwnd, field)
+        self._uia_set_value(field, text)
+        self._restore_foreground(hwnd, previous_foreground)
+
+    def _open_chat_via_search(self, hwnd: int, root, contact_name: str, previous_foreground: int) -> Optional[str]:
+        search = self._uia_find(root, UIA.UIA_ClassNamePropertyId, "mmui::XValidatorTextEdit")
+        if not search:
+            return None
+
+        def snapshot() -> list:
+            listing = self._uia_find(root, UIA.UIA_AutomationIdPropertyId, "search_list")
+            return [(e, e.CurrentAutomationId or "", e.CurrentName) for e in self._uia_children(listing)] if listing else []
+
+        # WeChat only shows search results while it believes it has focus; a sent WM_SETFOCUS does that without activating it
+        win32gui.SendMessage(hwnd, win32con.WM_SETFOCUS, 0, 0)
+        if not self._post_click(hwnd, search):
+            return None
+        time.sleep(0.2)
+        self._clear_field(hwnd, search)
+        time.sleep(0.2)
+        baseline = [s[1:] for s in snapshot()]
+        self._enter_text(hwnd, search, contact_name, previous_foreground)
+
+        # Results refresh with a lag; wait until they differ from the cleared state and stop changing
+        previous, current = None, []
+        deadline = time.monotonic() + 3.0
+        while time.monotonic() < deadline:
+            time.sleep(0.1)
+            current = snapshot()
+            keys = [s[1:] for s in current]
+            if keys and keys != baseline and keys == previous:
+                break
+            previous = keys
+        candidates = [e for e, auto_id, _ in current if auto_id.startswith("search_item_")]
+        # Results for any other query (e.g. stray input in the box) must not pick the chat
+        if not candidates or self._uia_value(search) != contact_name:
+            self._clear_field(hwnd, search)
+            return None
+        target = next((e for e in candidates if e.CurrentName == contact_name), candidates[0])
+        chat_name = target.CurrentName
+        if self._uia_current_chat(root) == chat_name:
+            # Selecting the chat that is already open closes it instead
+            # No Escape: outside the search box it can hide WeChat to the tray. Typing clicks the input box, which closes the search
+            self._clear_field(hwnd, search)
+            return chat_name
+        if self._post_click(hwnd, target) and self._wait_for(lambda: self._uia_current_chat(root) == chat_name, 2.0):
+            return chat_name
+        self._clear_field(hwnd, search)
+        return None
+
+    def _clear_field(self, hwnd: int, field) -> bool:
+        value = self._uia_value(field) or ""
+        if value:
+            # Deletes and backspaces in equal number empty the box wherever the caret is
+            units = len(value.encode("utf-16-le")) // 2 + 2
+            self._post_key(hwnd, win32con.VK_DELETE, units)
+            self._post_key(hwnd, win32con.VK_BACK, units)
+            if not self._wait_for(lambda: not self._uia_value(field), 1.0):
+                self._uia_set_value(field, "")
+        return not self._uia_value(field)
+
+    def _type_message(self, hwnd: int, field, message: str, previous_foreground: int) -> bool:
+        if not self._post_click(hwnd, field):
+            return False
+        time.sleep(0.2)
+        if not self._clear_field(hwnd, field):
+            return False
+        self._enter_text(hwnd, field, message, previous_foreground)
+        target = self._normalize(message)
+        return bool(self._wait_for(lambda: self._normalize(self._uia_value(field)) == target, 1.5))
+
+    def _send_via_uia(self, hwnd: int, contact_name: str, message: str, result: Dict[str, Any]) -> Dict[str, Any]:
+        result["method"] = "uia"
+        retries: List[str] = []
+        result["retry_used"] = retries
+        root = self._uia.ElementFromHandle(hwnd)
+        previous_foreground = win32gui.GetForegroundWindow()
+        was_minimized = bool(win32gui.IsIconic(hwnd))
+        if was_minimized:
+            win32gui.ShowWindow(hwnd, win32con.SW_SHOWNOACTIVATE)
+            time.sleep(0.5)
+
+        def fail(stage: str, reason: str) -> Dict[str, Any]:
+            result["stage"], result["reason"] = stage, reason
+            self.logger.error(f"UIA send failed at {stage}: {reason} (retries: {retries})")
+            return result
+
+        try:
+            chat_name = None
+            for attempt in range(2):
+                chat_name = self._open_chat_from_list(hwnd, root, contact_name) or self._open_chat_via_search(hwnd, root, contact_name, previous_foreground)
+                self._restore_foreground(hwnd, previous_foreground)
+                if chat_name:
+                    break
+                retries.append("open_chat")
+            if not chat_name:
+                return fail("open_chat", "contact_not_found_or_chat_not_opened")
+            result["chat_name"] = chat_name
+
+            field = self._wait_for(lambda: self._uia_find(root, UIA.UIA_AutomationIdPropertyId, "chat_input_field"), 2.0)
+            send_button = self._uia_find(root, UIA.UIA_ClassNamePropertyId, "mmui::XOutlineButton")
+            if not field or not send_button:
+                return fail("set_text", "input_field_not_found")
+            target = self._normalize(message)
+            before = self._uia_bubbles(root)
+
+            # Typing and clicking Send retry together; Send is only clicked while the box holds exactly the message
+            failure: Optional[tuple] = None
+            for attempt in range(2):
+                if failure:
+                    retries.append(failure[0])
+                if not self._type_message(hwnd, field, message, previous_foreground):
+                    failure = ("set_text", "input_text_mismatch")
+                    continue
+                if self._normalize(self._uia_value(field)) != target:
+                    failure = ("set_text", "input_changed_before_send")
+                    continue
+                self._post_click(hwnd, send_button)
+                if self._wait_for(lambda: not self._normalize(self._uia_value(field)), 3.0):
+                    failure = None
+                    break
+                failure = ("click_send", "send_button_had_no_effect")
+            if failure:
+                self._clear_field(hwnd, field)
+                return fail(*failure)
+
+            def delivered() -> bool:
+                after = self._uia_bubbles(root)
+                return bool(after) and after[-1] == target and after != before
+
+            if not self._wait_for(delivered, 4.0):
+                # Input was cleared, so it may have sent; not retried to avoid a duplicate
+                return fail("verify", "message_not_found_in_chat_after_send")
+
+            result.update(ok=True, verified=True, stage="send_text", reason=None)
+            return result
+        finally:
+            self._restore_foreground(hwnd, previous_foreground)
+            if win32gui.GetForegroundWindow() != hwnd:
+                # Undo the simulated focus from the search step
+                win32gui.SendMessage(hwnd, win32con.WM_KILLFOCUS, 0, 0)
+            if was_minimized:
+                win32gui.ShowWindow(hwnd, win32con.SW_SHOWMINNOACTIVE)
+
     async def send_text_message(self, contact_name: str, message: str) -> Dict[str, Any]:
         """向指定联系人发送文本消息。"""
         result: Dict[str, Any] = {
@@ -381,6 +802,8 @@ class WeChatController:
             "stage": None,
             "reason": None,
             "retry_used": None,
+            "verified": False,
+            "method": None,
         }
         try:
             version = self._detect_wechat_version()
@@ -398,6 +821,12 @@ class WeChatController:
                 result["reason"] = "wechat_window_not_found"
                 return result
 
+            if self._uia_chat_ui_available(hwnd):
+                return self._send_via_uia(hwnd, contact_name, message, result)
+
+            # Fallback for builds without an accessibility tree: keyboard input, needs foreground, unverified
+            self.logger.warning("WeChat UI Automation tree unavailable, falling back to keyboard input")
+            result["method"] = "keyboard"
             if not self._activate_window(hwnd):
                 result["stage"] = "activate_window"
                 result["reason"] = "failed_to_activate_window"
@@ -465,10 +894,14 @@ class WeChatController:
         }
 
     def default_test_contact(self) -> str:
-        """按客户端语言（窗口标题）返回测试联系人：中文版 文件传输助手，英文版 File。"""
+        """按客户端语言返回测试联系人：中文版 文件传输助手，英文版 File。
+        4.x 中文版窗口标题仍为 WeChat，因此同时检查搜索框名称。"""
         hwnd = self._find_wechat_window()
-        title = win32gui.GetWindowText(hwnd) if hwnd else ""
-        return "文件传输助手" if "微信" in title else "File"
+        chinese = "微信" in (win32gui.GetWindowText(hwnd) if hwnd else "")
+        if hwnd and not chinese and self._uia_client():
+            search = self._uia_find(self._uia.ElementFromHandle(hwnd), UIA.UIA_ClassNamePropertyId, "mmui::XValidatorTextEdit")
+            chinese = search is not None and search.CurrentName == "搜索"
+        return "文件传输助手" if chinese else "File"
 
     def get_status(self) -> Dict[str, Any]:
         """获取微信控制器的当前状态。"""
