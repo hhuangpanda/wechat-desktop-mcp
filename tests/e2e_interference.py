@@ -245,6 +245,13 @@ CASES = {
 }
 
 
+def mask(chat: str, contacts: dict) -> str:
+    """Shorten real chat names so test output can be shared."""
+    if not chat or chat == contacts["recipient"]:
+        return chat
+    return chat[:2] + "..."
+
+
 def run_case(name: str, contacts: dict, wechat_hwnd: int) -> dict:
     import win32con, win32gui
     mode, tool, expect_ok, suffix = CASES[name]
@@ -297,7 +304,7 @@ def run_case(name: str, contacts: dict, wechat_hwnd: int) -> dict:
     if name == "minimized":
         checks["minimized_state_restored"] = minimized_after
     return {"case": name, "passed": all(checks.values()), "failed_checks": [k for k, v in checks.items() if not v],
-            "started_in": other_chat, "ended_in": state["open_chat"], "reported": text,
+            "started_in": mask(other_chat, contacts), "ended_in": mask(state["open_chat"], contacts), "reported": text,
             "seconds": round(elapsed, 1), "interference": stats}
 
 
