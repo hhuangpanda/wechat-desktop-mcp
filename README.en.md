@@ -1,41 +1,79 @@
-# WeChat MCP Server
+# WeChat Desktop MCP Server
 
 <div align="center">
 
+[![PyPI](https://img.shields.io/pypi/v/wechat-desktop-mcp)](https://pypi.org/project/wechat-desktop-mcp/)
 ![Python version](https://img.shields.io/badge/python-3.9%2B-blue)
+![Platform](https://img.shields.io/badge/platform-Windows-0078D6)
+[![Tests](https://github.com/hhuangpanda/wechat-desktop-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/hhuangpanda/wechat-desktop-mcp/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/hhuangpanda/wechat-desktop-mcp/blob/main/LICENSE)
 
-**An MCP server that sends WeChat messages from the Windows desktop client**
+**An MCP server that sends WeChat messages in the background from the Windows desktop client**
 
-[简体中文](README.md) | **English**
+[简体中文](https://github.com/hhuangpanda/wechat-desktop-mcp/blob/main/README.md) | **English**
 
 </div>
 
 ---
 
-Windows 10/11 and WeChat 4.0 or later only. Works with any MCP client that can run a stdio server, such as Claude Desktop, Claude Code, or Codex in the ChatGPT app.
+Lets an AI assistant send WeChat (微信 / Weixin) messages for you, now or later, through the desktop client on your PC, without taking over your mouse or keyboard. Windows 10/11 and WeChat 4.0 or later only. Works with any MCP client that runs stdio servers, such as Claude Desktop, Claude Code, Cursor, opencode, DeepSeek Harness, or Codex in the ChatGPT app.
+
+For example: *"Send 'on my way' to File Transfer"*, or *"Remind the family group about dinner in 30 minutes"*.
+
+<!-- mcp-name: io.github.hhuangpanda/wechat-desktop-mcp -->
 
 ## Setup
 
-Requires Python 3.9+ and the WeChat desktop client, running and logged in. The window can be minimized or covered, but not closed to the system tray.
+Requires the WeChat desktop client, running and logged in. The window can be minimized or covered, but not closed to the system tray.
 
-```bash
-git clone https://github.com/hhuangpanda/WeChat-MCP-Server.git
-cd WeChat-MCP-Server
-pip install -r requirements.txt
-```
-
-Add the server to your client's MCP configuration (for Claude Desktop: `%APPDATA%\Claude\claude_desktop_config.json`):
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then add the server to your client's MCP configuration (for Claude Desktop: `%APPDATA%\Claude\claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "wechat": {
-      "command": "python",
-      "args": ["C:/path/to/WeChat-MCP-Server/src/mcp_server.py"]
+      "command": "uvx",
+      "args": ["wechat-desktop-mcp"]
     }
   }
 }
 ```
+
+For Claude Code:
+
+```bash
+claude mcp add wechat -- uvx wechat-desktop-mcp
+```
+
+For opencode:
+
+```bash
+opencode mcp add wechat --global -- uvx wechat-desktop-mcp
+```
+
+For DeepSeek Harness (dsh), add this entry to an agent preset:
+
+```yaml
+- id: mcp-wechat
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: wechat
+    transport: stdio
+    command: uvx
+    args: ['wechat-desktop-mcp']
+```
+
+Without uv, install Python 3.9+, run `pip install wechat-desktop-mcp` and use `"command": "wechat-desktop-mcp"` with no `args`.
+
+### From source
+
+```bash
+git clone https://github.com/hhuangpanda/wechat-desktop-mcp.git
+cd wechat-desktop-mcp
+pip install -e .
+```
+
+Then use `"command": "wechat-desktop-mcp"` as above.
 
 ## Tools
 
@@ -76,7 +114,7 @@ No parameters. Returns pending messages and the results of the last 20 that fire
 
 ## Testing
 
-`tests/test_server.py` and `tests/test_show_scheduled.py` send nothing. These send real messages to File Transfer:
+`tests/test_server.py`, `tests/test_show_scheduled.py` and `tests/test_stdio.py` send nothing. These send real messages to File Transfer:
 
 ```bash
 python tests/test_send_chinese.py
@@ -90,12 +128,16 @@ The e2e test opens its own window over WeChat and sends real mouse clicks and ke
 
 - **WeChat window not found**: make sure WeChat is running, logged in and not closed to the tray.
 - **Send failed**: `stage` shows the step. `open_chat` usually means the name matched no chat; check it as WeChat displays it.
-- **Client can't connect**: check the Python path and dependencies; the server logs to stderr.
+- **Client can't connect**: check that `uvx` (or `wechat-desktop-mcp`) is on the client's PATH; the server logs to stderr.
 
 ## Disclaimer
 
 This project has no affiliation with Tencent or WeChat. Automating WeChat may break its terms of service and get your account restricted or banned, and a WeChat update can break this project at any time. Don't use it for bulk messages, spam or harassment. You use it at your own risk.
 
+## Acknowledgements
+
+Based on [1052666/WeChat-MCP-Server](https://github.com/1052666/WeChat-MCP-Server), reworked here to send in the background and verify delivery.
+
 ## License
 
-[MIT](LICENSE). Bug reports and pull requests are welcome through [Issues](https://github.com/hhuangpanda/WeChat-MCP-Server/issues).
+[MIT](https://github.com/hhuangpanda/wechat-desktop-mcp/blob/main/LICENSE). Bug reports and pull requests are welcome through [Issues](https://github.com/hhuangpanda/wechat-desktop-mcp/issues).

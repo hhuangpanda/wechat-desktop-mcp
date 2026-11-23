@@ -12,6 +12,13 @@ from typing import Any, Dict, List, Optional, Union
 import logging
 import io
 
+if __package__:
+    from .wechat_controller import WeChatController
+else:
+    from wechat_controller import WeChatController
+
+__version__ = "1.1.0"
+
 # 设置标准输出编码为UTF-8
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
@@ -45,8 +52,8 @@ class MCPServer:
     """微信消息传递的 MCP 服务器实现。"""
     
     def __init__(self):
-        self.name = "wechat-mcp-server"
-        self.version = "1.0.0"
+        self.name = "wechat-desktop-mcp"
+        self.version = __version__
         self.initialized = False
         self.capabilities = {
             "tools": {}
@@ -58,7 +65,7 @@ class MCPServer:
     def _setup_logging(self):
         """设置日志配置。"""
         logging.basicConfig(
-            level=logging.DEBUG,
+            level=logging.INFO,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         self.logger = logging.getLogger(self.name)
@@ -116,7 +123,7 @@ class MCPServer:
             }
         ]
     
-    async def handle_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_request(self, request_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """处理传入的 JSON-RPC 请求。"""
         try:
             method = request_data.get("method")
@@ -124,7 +131,11 @@ class MCPServer:
             request_id = request_data.get("id")
             
             self.logger.info(f"处理请求: {method}")
-            
+
+            if "id" not in request_data:
+                return None
+            if method == "ping":
+                return JSONRPCResponse(result={}, id=request_id).to_dict()
             if method == "initialize":
                 return await self._handle_initialize(params, request_id)
             elif method == "tools/list":
@@ -231,9 +242,6 @@ class MCPServer:
                 }
                 return JSONRPCResponse(error=error, id=request_id).to_dict()
             
-            # 导入并使用微信功能
-            from wechat_controller import WeChatController
-            
             controller = WeChatController()
             send_result = await controller.send_text_message(contact_name, message)
 
@@ -271,9 +279,6 @@ class MCPServer:
                 }
                 return JSONRPCResponse(error=error, id=request_id).to_dict()
             
-            # 导入并使用微信功能
-            from wechat_controller import WeChatController
-            
             controller = WeChatController()
             success = await controller.schedule_message(contact_name, message, delay_seconds)
             
@@ -309,8 +314,6 @@ class MCPServer:
     async def _execute_show_scheduled(self, request_id: Optional[Union[str, int]]) -> Dict[str, Any]:
         """执行 show_scheduled_wechat_messages 工具。"""
         try:
-            from wechat_controller import WeChatController
-
             scheduled = WeChatController.list_scheduled()
             now = datetime.now().astimezone()
             payload = {
@@ -366,7 +369,9 @@ async def main():
                 
             request_data = json.loads(line.strip())
             response = await server.handle_request(request_data)
-            
+            if response is None:
+                continue
+
             print(json.dumps(response, ensure_ascii=False, separators=(',', ':')))
             sys.stdout.flush()
             
@@ -380,5 +385,9 @@ async def main():
             server.logger.error(f"意外错误: {e}")
             break
 
-if __name__ == "__main__":
+def run():
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    run()

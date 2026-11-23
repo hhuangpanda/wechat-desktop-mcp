@@ -45,10 +45,8 @@ class WeChatController:
     _recent: Deque[Dict[str, Any]] = deque(maxlen=20)
 
     def __init__(self):
-        # 设置日志级别为DEBUG
-        logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.DEBUG)
 
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = 0.3

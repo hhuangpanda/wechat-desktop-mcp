@@ -1,0 +1,25 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install .
+      - name: Stdio handshake (installed command)
+        run: python tests/test_stdio.py wechat-desktop-mcp
+      - name: Stdio handshake (from source)
+        run: python tests/test_stdio.py
+      - name: Scheduling
+        run: python tests/test_show_scheduled.py

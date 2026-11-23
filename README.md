@@ -1,10 +1,14 @@
-# WeChat MCP Server
+# WeChat Desktop MCP Server
 
 <div align="center">
 
+[![PyPI](https://img.shields.io/pypi/v/wechat-desktop-mcp)](https://pypi.org/project/wechat-desktop-mcp/)
 ![Python version](https://img.shields.io/badge/python-3.9%2B-blue)
+![Platform](https://img.shields.io/badge/platform-Windows-0078D6)
+[![Tests](https://github.com/hhuangpanda/wechat-desktop-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/hhuangpanda/wechat-desktop-mcp/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**通过 Windows 桌面版微信发送消息的 MCP 服务器**
+**通过 Windows 桌面版微信在后台发送消息的 MCP 服务器**
 
 **简体中文** | [English](README.en.md)
 
@@ -12,30 +16,64 @@
 
 ---
 
-仅支持 Windows 10/11 和微信 4.0 及以上版本。适用于任何能运行 stdio 服务器的 MCP 客户端，例如 Claude Desktop、Claude Code 或 ChatGPT 应用中的 Codex。
+让 AI 助手通过电脑上的微信桌面客户端，立即或定时替你发送微信消息，且不占用你的鼠标和键盘。仅支持 Windows 10/11 和微信 4.0 及以上版本。适用于任何能运行 stdio 服务器的 MCP 客户端，例如 Claude Desktop、Claude Code、Cursor、opencode、DeepSeek Harness 或 ChatGPT 应用中的 Codex。
+
+例如：*"给文件传输助手发一条'马上到'"*，或 *"30 分钟后提醒家庭群吃饭"*。
+
+<!-- mcp-name: io.github.hhuangpanda/wechat-desktop-mcp -->
 
 ## 安装和配置
 
-需要 Python 3.9+ 和已启动并登录的微信桌面客户端。窗口可以最小化或被遮挡，但不能关闭到系统托盘。
+需要已启动并登录的微信桌面客户端。窗口可以最小化或被遮挡，但不能关闭到系统托盘。
 
-```bash
-git clone https://github.com/hhuangpanda/WeChat-MCP-Server.git
-cd WeChat-MCP-Server
-pip install -r requirements.txt
-```
-
-将服务器添加到客户端的 MCP 配置中（Claude Desktop：`%APPDATA%\Claude\claude_desktop_config.json`）：
+安装 [uv](https://docs.astral.sh/uv/getting-started/installation/)，然后将服务器添加到客户端的 MCP 配置中（Claude Desktop：`%APPDATA%\Claude\claude_desktop_config.json`）：
 
 ```json
 {
   "mcpServers": {
     "wechat": {
-      "command": "python",
-      "args": ["C:/path/to/WeChat-MCP-Server/src/mcp_server.py"]
+      "command": "uvx",
+      "args": ["wechat-desktop-mcp"]
     }
   }
 }
 ```
+
+Claude Code：
+
+```bash
+claude mcp add wechat -- uvx wechat-desktop-mcp
+```
+
+opencode：
+
+```bash
+opencode mcp add wechat --global -- uvx wechat-desktop-mcp
+```
+
+DeepSeek Harness（dsh）：在智能体预设中添加以下条目：
+
+```yaml
+- id: mcp-wechat
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: wechat
+    transport: stdio
+    command: uvx
+    args: ['wechat-desktop-mcp']
+```
+
+不使用 uv 时，安装 Python 3.9+，运行 `pip install wechat-desktop-mcp`，并使用 `"command": "wechat-desktop-mcp"`（不需要 `args`）。
+
+### 从源码运行
+
+```bash
+git clone https://github.com/hhuangpanda/wechat-desktop-mcp.git
+cd wechat-desktop-mcp
+pip install -e .
+```
+
+然后同样使用 `"command": "wechat-desktop-mcp"`。
 
 ## 工具
 
@@ -76,7 +114,7 @@ pip install -r requirements.txt
 
 ## 测试
 
-`tests/test_server.py` 和 `tests/test_show_scheduled.py` 不发送任何消息。以下命令会向文件传输助手发送真实消息：
+`tests/test_server.py`、`tests/test_show_scheduled.py` 和 `tests/test_stdio.py` 不发送任何消息。以下命令会向文件传输助手发送真实消息：
 
 ```bash
 python tests/test_send_chinese.py
@@ -90,12 +128,16 @@ python tests/e2e_interference.py
 
 - **找不到微信窗口**：确认微信已启动、已登录，且没有关闭到托盘。
 - **发送失败**：`stage` 指出失败的步骤。`open_chat` 通常表示名称没有匹配到聊天，请按微信中显示的名称检查。
-- **客户端无法连接**：检查 Python 路径和依赖；服务器日志输出到 stderr。
+- **客户端无法连接**：确认客户端的 PATH 中能找到 `uvx`（或 `wechat-desktop-mcp`）；服务器日志输出到 stderr。
 
 ## 免责声明
 
 本项目与腾讯公司、微信官方无任何关联。自动化操作微信可能违反其服务条款，导致账号被限制或封禁，微信更新也可能随时使本项目失效。请勿用于批量发送、垃圾消息或骚扰他人。使用风险自负。
 
+## 致谢
+
+基于 [1052666/WeChat-MCP-Server](https://github.com/1052666/WeChat-MCP-Server)，在此基础上改为后台发送并确认送达。
+
 ## 许可证
 
-[MIT](LICENSE)。欢迎通过 [Issues](https://github.com/hhuangpanda/WeChat-MCP-Server/issues) 报告问题或提交 Pull Request。
+[MIT](LICENSE)。欢迎通过 [Issues](https://github.com/hhuangpanda/wechat-desktop-mcp/issues) 报告问题或提交 Pull Request。

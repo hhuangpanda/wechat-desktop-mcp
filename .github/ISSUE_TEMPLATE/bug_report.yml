@@ -1,0 +1,30 @@
+name: Bug report
+description: A message failed to send, went to the wrong chat, or the server won't start
+body:
+  - type: input
+    id: wechat
+    attributes:
+      label: WeChat version
+      description: Settings > About in WeChat
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and display scaling
+      placeholder: Windows 11 24H2, 150%
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: MCP client
+      placeholder: Claude Desktop, Claude Code, Cursor...
+  - type: textarea
+    id: result
+    attributes:
+      label: Tool result and stderr log
+      description: Include the full "Failed to send message (stage=..., reason=...)" text. Remove contact names and message text you don't want public.
+      render: text
+    validations:
+      required: true
