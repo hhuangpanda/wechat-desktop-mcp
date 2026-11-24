@@ -2,10 +2,12 @@
 """
 MCP 客户端示例
 演示如何与微信 MCP 服务器交互。
+用法：python examples/mcp_client_example.py [联系人]（默认依次尝试 文件传输助手 和 File）
 """
 
 import asyncio
 import json
+import os
 import subprocess
 import sys
 from typing import Dict, Any, Optional
@@ -91,7 +93,10 @@ class MCPClient:
 async def main():
     """主示例函数。"""
     # MCP 服务器路径
-    server_path = "../src/mcp_server.py"
+    server_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "mcp_server.py")
+    # File Transfer is 文件传输助手 in Chinese clients; "File" is only tried after that chat wasn't found,
+    # since in a Chinese client a search for "File" can open another chat
+    contacts = sys.argv[1:2] or ["文件传输助手", "File"]
     
     client = MCPClient(server_path)
     
@@ -107,15 +112,18 @@ async def main():
         
         # 示例 1：发送简单消息
         print("\n=== Example 1: Send Message ===")
-        await client.call_tool("send_wechat_message", {
-            "contact_name": "文件传输助手",
-            "message": "Hello from MCP! This is a test message."
-        })
+        for contact in contacts:
+            response = await client.call_tool("send_wechat_message", {
+                "contact_name": contact,
+                "message": "Hello from MCP! This is a test message."
+            })
+            if "stage=open_chat" not in json.dumps(response):
+                break
         
         # 示例 2：安排消息
         print("\n=== Example 2: Schedule Message ===")
         await client.call_tool("schedule_wechat_message", {
-            "contact_name": "文件传输助手",
+            "contact_name": contact,
             "message": "This is a scheduled message sent 5 seconds later!",
             "delay_seconds": 5
         })
@@ -123,6 +131,7 @@ async def main():
         # 等待一段时间查看安排的消息
         print("Waiting for scheduled message...")
         await asyncio.sleep(6)
+        await client.call_tool("show_scheduled_wechat_messages", {})
         
     except Exception as e:
         print(f"Error: {e}")

@@ -7,7 +7,7 @@
 import asyncio
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 import logging
 import io
@@ -17,7 +17,11 @@ if __package__:
 else:
     from wechat_controller import WeChatController
 
-__version__ = "1.1.0"
+try:
+    from importlib.metadata import PackageNotFoundError, version as _package_version
+    __version__ = _package_version("wechat-desktop-mcp")
+except PackageNotFoundError:
+    __version__ = "0.0.0"
 
 # 设置标准输出编码为UTF-8
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -283,11 +287,16 @@ class MCPServer:
             success = await controller.schedule_message(contact_name, message, delay_seconds)
             
             if success:
+                send_at = datetime.now().astimezone() + timedelta(seconds=delay_seconds)
+                text = f"Message scheduled for {send_at:%Y-%m-%d %H:%M:%S} (in {delay_seconds:g} seconds)."
+                issue = controller.availability_issue()
+                if issue:
+                    text += f" Warning ({issue}): WeChat must be open, not in the tray, by then or the send will fail."
                 result = {
                     "content": [
                         {
                             "type": "text",
-                            "text": f"Message scheduled to be sent in {delay_seconds} seconds"
+                            "text": text
                         }
                     ]
                 }

@@ -28,6 +28,8 @@ import win32con
 import win32gui
 import win32clipboard
 
+WECHAT_PROCESS_NAMES = ("weixin.exe", "wechat.exe")
+
 VK_PACKET = 0xE7
 
 try:
@@ -62,8 +64,8 @@ class WeChatController:
             window_is_nt = self._last_window_kind == "nt" and window_hwnd is not None
 
             for proc in psutil.process_iter(['name', 'exe']):
-                name = proc.info.get('name') or ""
-                if 'wechat' not in name.lower():
+                # Exact names: substring matching also hits helpers such as WeChatAppEx.exe
+                if (proc.info.get('name') or "").lower() not in WECHAT_PROCESS_NAMES:
                     continue
 
                 exe = proc.info.get('exe')
@@ -106,7 +108,7 @@ class WeChatController:
         nt_windows = []
         legacy_windows = []
         # Title matching alone also hits other apps, e.g. an editor showing a path containing "WeChat"
-        wechat_pids = {p.pid for p in psutil.process_iter(['name']) if (p.info.get('name') or "").lower() in ("weixin.exe", "wechat.exe")}
+        wechat_pids = {p.pid for p in psutil.process_iter(['name']) if (p.info.get('name') or "").lower() in WECHAT_PROCESS_NAMES}
 
         def enum_windows_callback(hwnd, _):
             if not win32gui.IsWindowVisible(hwnd):
@@ -810,6 +812,11 @@ class WeChatController:
             result["wechat_version"] = version
             result["is_nt_framework"] = self.is_nt_version
 
+            if version is None and not self.is_nt_version:
+                result["stage"] = "find_window"
+                result["reason"] = "wechat_not_running"
+                return result
+
             if not self.is_nt_version:
                 result["stage"] = "version_check"
                 result["reason"] = "non_nt_version_skipped"
@@ -852,6 +859,15 @@ class WeChatController:
             result["reason"] = str(e)
             return result
     
+    def availability_issue(self) -> Optional[str]:
+        """Reason code if a send right now would fail for lack of a WeChat window, else None."""
+        version = self._detect_wechat_version()
+        if version is None and not self.is_nt_version:
+            return "wechat_not_running"
+        if self.is_nt_version and not self._find_wechat_window():
+            return "wechat_window_not_found"
+        return None
+
     async def schedule_message(self, contact_name: str, message: str, delay_seconds: float) -> bool:
         """安排在延迟后发送消息。"""
         try:
@@ -914,7 +930,7 @@ class WeChatController:
                 "wechat_version": version,
                 "is_nt_framework": self.is_nt_version,
                 "supported": self.is_nt_version,
-                "framework_type": "NT framework (4.0+)" if self.is_nt_version else "Legacy (<4.0, skipped)"
+                "framework_type": "NT framework (4.0+)" if self.is_nt_version else ("Not running" if version is None else "Legacy (<4.0, skipped)")
             }
         except Exception as e:
             self.logger.error(f"Error checking status: {e}")

@@ -8,18 +8,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Check tag format
+        run: '[[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Tag must look like v1.2.3"; exit 1; }'
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
-      - name: Check tag matches versions
-        run: |
-          tag="${GITHUB_REF_NAME#v}"
-          src=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/mcp_server.py)
-          [ "$tag" = "$src" ] || { echo "tag $tag != src/mcp_server.py $src"; exit 1; }
-          [ "$(jq -r .version server.json)" = "$tag" ] || { echo "server.json version mismatch"; exit 1; }
-          [ "$(jq -r '.packages[0].version' server.json)" = "$tag" ] || { echo "server.json package version mismatch"; exit 1; }
       - run: pip install build && python -m build
+      - name: Check built version matches tag
+        run: ls dist/*-"${GITHUB_REF_NAME#v}"-py3-none-any.whl
       - uses: actions/upload-artifact@v4
         with:
           name: dist
@@ -62,8 +61,26 @@ jobs:
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "$archive"
           tar xzf "$archive" mcp-publisher
+      - name: Set version in server.json
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          jq --arg v "$v" '.version = $v | .packages[0].version = $v' server.json > server.tmp && mv server.tmp server.json
       - run: ./mcp-publisher login github-oidc
       - name: Publish (retries while PyPI propagates)
         run: |
           for i in 1 2 3 4 5; do ./mcp-publisher publish && exit 0; sleep 30; done
           exit 1
+
+  github-release:
+    needs: pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: dist
+          path: dist/
+      - run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

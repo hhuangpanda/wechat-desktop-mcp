@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=69", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -52,5 +52,6 @@ wechat-desktop-mcp = "wechat_desktop_mcp.mcp_server:run"
 packages = ["wechat_desktop_mcp"]
 package-dir = { wechat_desktop_mcp = "src" }
 
-[tool.setuptools.dynamic]
-version = { attr = "wechat_desktop_mcp.mcp_server.__version__" }
+# Version comes from the git tag (v1.2.0 -> 1.2.0)
+[tool.setuptools_scm]
+fallback_version = "0.0.0"

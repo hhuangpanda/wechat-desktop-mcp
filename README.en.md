@@ -86,11 +86,13 @@ Then use `"command": "wechat-desktop-mcp"` as above.
 
 The chat is opened from the chat list if it is visible there, otherwise through WeChat's search. A search picks the result whose name matches exactly, or the first result if none does, so a partial name such as `File` reaches File Transfer, but a vague name can reach the wrong chat.
 
-Returns `Message sent and verified in chat '<chat name>'`, plus `(retried: ...)` if a step needed a retry. On failure the result has `isError: true` and text such as `Failed to send message (stage=open_chat, reason=contact_not_found_or_chat_not_opened, ...)`, where `stage` is one of `find_window`, `open_chat`, `set_text`, `click_send`, `verify`.
+Returns `Message sent and verified in chat '<chat name>'`, plus `(retried: ...)` if a step needed a retry. On failure the result has `isError: true` and text such as `Failed to send message (stage=open_chat, reason=contact_not_found_or_chat_not_opened, ...)`, where `stage` is one of `find_window`, `version_check`, `open_chat`, `set_text`, `click_send`, `verify`.
 
 ### schedule_wechat_message
 
 Same parameters as `send_wechat_message`, plus `delay_seconds` (`number`).
+
+Returns `Message scheduled for <local time> (in <n> seconds).` If WeChat isn't running or is in the tray at that moment, it adds `Warning (wechat_not_running)` or `Warning (wechat_window_not_found)`; the message stays scheduled, but WeChat must be open by the send time.
 
 ### show_scheduled_wechat_messages
 
@@ -114,11 +116,11 @@ No parameters. Returns pending messages and the results of the last 20 that fire
 
 ## Testing
 
-`tests/test_server.py`, `tests/test_show_scheduled.py` and `tests/test_stdio.py` send nothing. These send real messages to File Transfer:
+`tests/test_server.py`, `tests/test_show_scheduled.py`, `tests/test_stdio.py` and `tests/test_detection.py` send nothing. These send real messages to File Transfer:
 
 ```bash
 python tests/test_send_chinese.py
-cd examples && python mcp_client_example.py && cd ..
+python examples/mcp_client_example.py
 python tests/e2e_interference.py
 ```
 
@@ -126,7 +128,8 @@ The e2e test opens its own window over WeChat and sends real mouse clicks and ke
 
 ## Troubleshooting
 
-- **WeChat window not found**: make sure WeChat is running, logged in and not closed to the tray.
+- **`stage=find_window`**: `reason=wechat_not_running` means WeChat isn't running; `wechat_window_not_found` means it's running but has no window, usually because it was closed to the tray.
+- **`stage=version_check`**: WeChat is older than 4.0; update it.
 - **Send failed**: `stage` shows the step. `open_chat` usually means the name matched no chat; check it as WeChat displays it.
 - **Client can't connect**: check that `uvx` (or `wechat-desktop-mcp`) is on the client's PATH; the server logs to stderr.
 
